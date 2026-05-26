@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fruit by the Foot">
+<meta name="theme-color" content="#1a3a2a">
+<title>Tom's Fruit by the Foot</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --lava:#1e1e1e;--jungle:#1a3a2a;--canopy:#2d6b45;--fern:#4a9e68;--lime:#7ec883;
+  --papaya:#e8992f;--mango:#f0b74a;--guava:#d95570;--ocean:#2584a3;--sky:#aadceb;
+  --sand:#f4efe6;--coconut:#fffdf7;--bark:#6b4c3b;--taro:#6e5b8a;
+  --shadow:rgba(26,42,30,0.18);--radius:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Nunito Sans',sans-serif;background:var(--sand);color:var(--lava);overflow:hidden;height:100vh;width:100vw;}
+#app{display:flex;height:100vh;width:100vw;position:relative;}
+
+/* ─── Sidebar ─── */
+#sidebar{width:380px;min-width:380px;background:var(--coconut);display:flex;flex-direction:column;z-index:1000;box-shadow:3px 0 24px var(--shadow);transition:margin-left .35s cubic-bezier(.4,0,.2,1);position:relative;}
+#sidebar.collapsed{margin-left:-380px;}
+#toggle-sb{position:absolute;top:14px;right:-44px;width:38px;height:38px;background:var(--jungle);color:#fff;border:none;border-radius:0 8px 8px 0;cursor:pointer;font-size:18px;z-index:1001;display:flex;align-items:center;justify-content:center;box-shadow:3px 2px 10px var(--shadow);}
+#toggle-sb:hover{background:var(--canopy);}
+
+.sb-header{padding:20px 22px 14px;background:linear-gradient(145deg,var(--jungle),var(--canopy) 70%,var(--fern));color:#fff;position:relative;overflow:hidden;}
+.sb-header::after{content:'';position:absolute;top:-30px;right:-30px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,.05);}
+.sb-header h1{font-family:'Playfair Display',serif;font-weight:800;font-size:21px;letter-spacing:.3px;margin-bottom:2px;}
+.sb-header p{font-size:11px;opacity:.6;font-weight:600;letter-spacing:.6px;text-transform:uppercase;}
+
+/* Toolbar */
+.toolbar{display:flex;gap:5px;padding:10px 16px;border-bottom:1px solid rgba(26,58,42,.07);flex-wrap:wrap;}
+.tb{font-family:'Nunito Sans',sans-serif;font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;border:1.5px solid var(--canopy);background:transparent;color:var(--canopy);cursor:pointer;transition:all .2s;letter-spacing:.2px;}
+.tb:hover,.tb.active{background:var(--canopy);color:#fff;}
+.tb.ex{border-color:var(--ocean);color:var(--ocean);}.tb.ex:hover{background:var(--ocean);color:#fff;}
+.tb.im{border-color:var(--bark);color:var(--bark);}.tb.im:hover{background:var(--bark);color:#fff;}
+.tb.ref{border-color:var(--taro);color:var(--taro);}.tb.ref:hover{background:var(--taro);color:#fff;}
+
+/* Tabs for filters */
+.filter-tabs{display:flex;border-bottom:1px solid rgba(26,58,42,.07);}
+.ftab{flex:1;padding:8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;border:none;background:transparent;color:var(--bark);transition:all .15s;letter-spacing:.4px;text-transform:uppercase;border-bottom:2px solid transparent;}
+.ftab.active{color:var(--canopy);border-bottom-color:var(--canopy);}
+
+.filter-section{padding:10px 16px;border-bottom:1px solid rgba(26,58,42,.07);display:none;}
+.filter-section.active{display:block;}
+.filter-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--bark);margin-bottom:6px;}
+.month-chips,.zone-chips{display:flex;flex-wrap:wrap;gap:4px;}
+.chip{font-family:'Nunito Sans',sans-serif;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:14px;border:1.5px solid rgba(26,58,42,.15);background:transparent;color:var(--jungle);cursor:pointer;transition:all .15s;}
+.chip:hover{background:rgba(74,158,104,.1);}
+.chip.active{background:var(--fern);color:#fff;border-color:var(--fern);}
+.zone-chip-color{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle;}
+
+.spot-count{padding:7px 16px;font-size:11px;font-weight:600;color:var(--bark);border-bottom:1px solid rgba(26,58,42,.07);}
+.spot-count span{color:var(--canopy);font-weight:800;}
+
+/* Spot List */
+.spot-list{flex:1;overflow-y:auto;padding:8px 12px;}
+.spot-list::-webkit-scrollbar{width:5px;}
+.spot-list::-webkit-scrollbar-thumb{background:rgba(26,58,42,.12);border-radius:3px;}
+
+.scard{background:#fff;border-radius:var(--radius);padding:12px 14px;margin-bottom:7px;border:1px solid rgba(26,58,42,.05);box-shadow:0 1px 6px rgba(26,58,42,.05);cursor:pointer;transition:all .2s;}
+.scard:hover{box-shadow:0 4px 16px rgba(26,58,42,.1);transform:translateY(-1px);}
+.sc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;}
+.sc-name{font-family:'Playfair Display',serif;font-weight:700;font-size:14.5px;color:var(--jungle);}
+.sc-zone-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;color:#fff;white-space:nowrap;}
+.sc-months{font-size:10.5px;color:var(--bark);margin-bottom:2px;}
+.sc-notes{font-size:11px;color:#666;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sc-yield{font-size:10.5px;color:var(--ocean);font-weight:600;margin-top:2px;}
+.sc-photo-thumb{width:100%;height:72px;object-fit:cover;border-radius:6px;margin-top:5px;}
+.sc-actions{display:flex;gap:5px;margin-top:7px;}
+.sc-btn{font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;padding:4px 9px;border-radius:6px;border:none;cursor:pointer;transition:all .15s;}
+.sc-btn-fly{background:#e6f3f7;color:var(--ocean);}.sc-btn-fly:hover{background:var(--ocean);color:#fff;}
+.sc-btn-edit{background:var(--sand);color:var(--jungle);}.sc-btn-edit:hover{background:var(--canopy);color:#fff;}
+.sc-btn-del{background:#fce8ec;color:var(--guava);}.sc-btn-del:hover{background:var(--guava);color:#fff;}
+
+.cdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+
+/* ─── Map ─── */
+#map-wrap{flex:1;position:relative;}
+#map{width:100%;height:100%;z-index:1;}
+.leaflet-popup-content-wrapper{border-radius:var(--radius)!important;font-family:'Nunito Sans',sans-serif!important;box-shadow:0 4px 20px var(--shadow)!important;}
+.leaflet-popup-content{margin:12px 16px!important;font-size:13px;}
+
+.zone-tooltip{font-family:'Nunito Sans',sans-serif!important;font-size:12px!important;border-radius:8px!important;padding:8px 12px!important;box-shadow:0 4px 12px var(--shadow)!important;border:none!important;}
+
+#map-hint{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);background:var(--jungle);color:#fff;padding:8px 20px;border-radius:24px;font-size:12px;font-weight:600;z-index:999;pointer-events:none;opacity:0;transition:opacity .4s;box-shadow:0 4px 16px var(--shadow);white-space:nowrap;}
+#map-hint.show{opacity:1;}
+
+/* ─── Modal ─── */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;justify-content:center;align-items:center;backdrop-filter:blur(3px);}
+.mo.open{display:flex;}
+.modal{background:var(--coconut);border-radius:16px;width:460px;max-width:93vw;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:mIn .3s cubic-bezier(.4,0,.2,1);}
+@keyframes mIn{from{opacity:0;transform:translateY(20px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
+.modal::-webkit-scrollbar{width:5px;}.modal::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:3px;}
+.mh{padding:18px 22px 12px;border-bottom:1px solid rgba(26,58,42,.07);display:flex;justify-content:space-between;align-items:center;}
+.mh h2{font-family:'Playfair Display',serif;font-weight:700;font-size:19px;color:var(--jungle);}
+.mx{width:30px;height:30px;border-radius:50%;border:none;background:var(--sand);color:var(--bark);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}.mx:hover{background:var(--guava);color:#fff;}
+.mb{padding:16px 22px 22px;}
+.mf{padding:0 22px 20px;display:flex;gap:10px;justify-content:flex-end;}
+
+.fd{margin-bottom:14px;}
+.fd label{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--bark);margin-bottom:4px;}
+.fd input[type="text"],.fd input[type="number"],.fd textarea,.fd select{width:100%;padding:8px 12px;border:1.5px solid rgba(26,58,42,.15);border-radius:8px;font-family:'Nunito Sans',sans-serif;font-size:13px;color:var(--lava);background:#fff;outline:none;transition:border-color .2s;}
+.fd input:focus,.fd textarea:focus,.fd select:focus{border-color:var(--canopy);}
+.fd textarea{resize:vertical;min-height:60px;}
+.coord-row{display:flex;gap:10px;}.coord-row .fd{flex:1;}
+
+.season-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+.sc{font-family:'Nunito Sans',sans-serif;font-size:11px;font-weight:700;padding:5px 0;border-radius:8px;border:1.5px solid rgba(26,58,42,.13);background:#fff;color:var(--jungle);cursor:pointer;transition:all .15s;text-align:center;}
+.sc:hover{background:rgba(74,158,104,.08);}.sc.active{background:var(--canopy);color:#fff;border-color:var(--canopy);}
+
+.photo-area{border:2px dashed rgba(26,58,42,.15);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;position:relative;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.photo-area:hover{border-color:var(--canopy);background:rgba(74,158,104,.03);}
+.photo-area img{max-width:100%;max-height:160px;border-radius:6px;object-fit:contain;}
+.ph-label{font-size:12px;color:var(--bark);font-weight:600;}
+.ph-sub{font-size:10px;color:#999;margin-top:2px;}
+.photo-rm{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:none;background:var(--guava);color:#fff;font-size:13px;cursor:pointer;display:none;align-items:center;justify-content:center;}
+.photo-area.has-photo .photo-rm{display:flex;}
+.photo-area.has-photo .ph-label,.photo-area.has-photo .ph-sub{display:none;}
+
+.btn-save{font-family:'Nunito Sans',sans-serif;font-weight:700;font-size:13px;padding:9px 26px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--canopy),var(--fern));color:#fff;cursor:pointer;transition:all .2s;box-shadow:0 3px 12px rgba(45,107,69,.25);}
+.btn-save:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(45,107,69,.35);}
+.btn-cancel{font-family:'Nunito Sans',sans-serif;font-weight:700;font-size:13px;padding:9px 20px;border-radius:10px;border:1.5px solid rgba(26,58,42,.15);background:#fff;color:var(--jungle);cursor:pointer;}.btn-cancel:hover{background:var(--sand);}
+
+/* Zone Ref Panel */
+.zone-ref{display:none;position:absolute;top:10px;right:60px;width:320px;max-height:80vh;overflow-y:auto;background:var(--coconut);border-radius:14px;box-shadow:0 8px 32px var(--shadow);z-index:1500;padding:16px 18px;animation:mIn .3s cubic-bezier(.4,0,.2,1);}
+.zone-ref.open{display:block;}
+.zone-ref h3{font-family:'Playfair Display',serif;font-size:16px;color:var(--jungle);margin-bottom:10px;}
+.zone-ref .zr-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(26,58,42,.05);font-size:12px;}
+.zone-ref .zr-dot{width:14px;height:14px;border-radius:4px;flex-shrink:0;}
+.zone-ref .zr-name{font-weight:700;min-width:50px;}
+.zone-ref .zr-desc{color:#666;font-size:11.5px;}
+.zone-ref .zr-close{position:absolute;top:10px;right:12px;width:24px;height:24px;border-radius:50%;border:none;background:var(--sand);color:var(--bark);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.zone-ref .zr-src{margin-top:10px;font-size:10px;color:var(--bark);line-height:1.4;}
+.zone-ref .zr-src a{color:var(--ocean);}
+
+/* Plant Lookup Panel */
+.plant-lookup{display:none;position:absolute;bottom:20px;right:20px;width:340px;max-height:50vh;overflow-y:auto;background:var(--coconut);border-radius:14px;box-shadow:0 8px 32px var(--shadow);z-index:1500;padding:14px 16px;animation:mIn .3s cubic-bezier(.4,0,.2,1);}
+.plant-lookup.open{display:block;}
+.plant-lookup h3{font-family:'Playfair Display',serif;font-size:15px;color:var(--jungle);margin-bottom:8px;}
+.plant-lookup .pl-close{position:absolute;top:10px;right:12px;width:24px;height:24px;border-radius:50%;border:none;background:var(--sand);color:var(--bark);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.pl-search{width:100%;padding:7px 10px;border:1.5px solid rgba(26,58,42,.15);border-radius:8px;font-family:'Nunito Sans',sans-serif;font-size:12px;outline:none;margin-bottom:8px;}
+.pl-search:focus{border-color:var(--canopy);}
+.pl-item{padding:5px 0;border-bottom:1px solid rgba(26,58,42,.04);font-size:11.5px;line-height:1.4;}
+.pl-item .pl-common{font-weight:700;color:var(--jungle);}
+.pl-item .pl-sci{font-style:italic;color:#888;font-size:10.5px;}
+.pl-item .pl-meta{color:var(--bark);font-size:10px;}
+
+#import-input,#photo-input{display:none;}
+
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--jungle);color:#fff;padding:10px 24px;border-radius:10px;font-size:13px;font-weight:600;z-index:3000;transition:transform .35s cubic-bezier(.4,0,.2,1);box-shadow:0 6px 24px var(--shadow);white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+.empty{text-align:center;padding:36px 18px;color:var(--bark);}
+.empty .ei{font-size:36px;margin-bottom:8px;}
+.empty h3{font-family:'Playfair Display',serif;font-size:15px;margin-bottom:5px;color:var(--jungle);}
+.empty p{font-size:11.5px;line-height:1.5;}
+
+@media(max-width:700px){
+  #sidebar{width:100%;min-width:100%;position:absolute;top:0;left:0;bottom:0;z-index:1100;}
+  #sidebar.collapsed{margin-left:-100%;}
+  #toggle-sb{right:-40px;width:44px;height:44px;font-size:20px;}
+  .zone-ref,.plant-lookup{width:90vw;right:5vw;left:5vw;}
+  .tb{padding:8px 14px;font-size:12px;}
+  .chip{padding:6px 12px;font-size:12px;}
+  .sc{padding:8px 0;font-size:12px;}
+  .scard{padding:14px 16px;}
+  .sc-btn{padding:7px 14px;font-size:12px;}
+  .fd input[type="text"],.fd input[type="number"],.fd textarea,.fd select{padding:11px 14px;font-size:14px;}
+  .season-grid{grid-template-columns:repeat(3,1fr);gap:6px;}
+  .btn-save,.btn-cancel{padding:12px 24px;font-size:14px;}
+  .ftab{padding:12px;font-size:12px;}
+  .mx{width:36px;height:36px;font-size:20px;}
+  .photo-area{padding:20px;min-height:90px;}
+}
+
+/* ─── Login Screen ─── */
+#login-overlay{position:fixed;inset:0;background:linear-gradient(145deg,var(--jungle),var(--canopy) 70%,var(--fern));z-index:5000;display:flex;align-items:center;justify-content:center;padding:20px;}
+#login-overlay.hidden{display:none;}
+.login-card{background:var(--coconut);border-radius:16px;padding:32px 28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.login-card h1{font-family:'Playfair Display',serif;font-weight:800;font-size:24px;color:var(--jungle);margin-bottom:4px;text-align:center;}
+.login-card .login-sub{font-size:11px;color:var(--bark);text-align:center;text-transform:uppercase;letter-spacing:1px;margin-bottom:22px;}
+.login-card .fd{margin-bottom:14px;}
+.login-card .fd label{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--bark);margin-bottom:4px;}
+.login-card .fd input{width:100%;padding:11px 14px;border:1.5px solid rgba(26,58,42,.15);border-radius:8px;font-family:'Nunito Sans',sans-serif;font-size:14px;background:#fff;outline:none;}
+.login-card .fd input:focus{border-color:var(--canopy);}
+#login-btn{width:100%;background:var(--canopy);color:#fff;border:none;padding:12px;border-radius:8px;font-family:'Nunito Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;}
+#login-btn:hover{background:var(--jungle);}
+#login-btn:disabled{opacity:.6;cursor:wait;}
+#login-error{font-size:12px;color:var(--guava);text-align:center;margin-top:10px;min-height:16px;}
+.login-loading{text-align:center;color:#fff;font-family:'Playfair Display',serif;font-size:18px;}
+
+/* ─── Logout Button ─── */
+#btn-logout{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;letter-spacing:.5px;cursor:pointer;text-transform:uppercase;}
+#btn-logout:hover{background:rgba(255,255,255,.28);}
+
+/* Sync indicator */
+#sync-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;opacity:.55;letter-spacing:.5px;text-transform:uppercase;font-weight:600;pointer-events:none;}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-overlay">
+  <div class="login-card">
+    <h1>🌿 Tom's Fruit by the Foot</h1>
+    <div class="login-sub">Sign In</div>
+    <div class="fd"><label>Email</label><input type="email" id="login-email" autocomplete="username" placeholder="you@example.com"></div>
+    <div class="fd"><label>Password</label><input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••"></div>
+    <button id="login-btn">Sign In</button>
+    <div id="login-error"></div>
+    <div id="sync-indicator"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <button id="toggle-sb" title="Toggle sidebar">☰</button>
+    <div class="sb-header">
+      <h1>🌿 Tom's Fruit by the Foot</h1>
+      <p>Personal Harvest Map</p>
+      <button id="btn-logout" title="Sign out">Logout</button>
+    </div>
+    <div class="toolbar">
+      <button class="tb active" id="btn-add">＋ Add Spot</button>
+      <button class="tb" id="btn-manual">📍 Manual</button>
+      <button class="tb ref" id="btn-zones">🗺 Zones</button>
+      <button class="tb ref" id="btn-plants">🌱 Plants</button>
+      <button class="tb ex" id="btn-export">⬇ Export</button>
+      <button class="tb im" id="btn-import">⬆ Import</button>
+    </div>
+    <div class="filter-tabs">
+      <button class="ftab active" data-tab="month">By Month</button>
+      <button class="ftab" data-tab="zone">By Zone</button>
+    </div>
+    <div class="filter-section active" id="fs-month">
+      <div class="month-chips" id="month-filter"></div>
+    </div>
+    <div class="filter-section" id="fs-zone">
+      <div class="zone-chips" id="zone-filter"></div>
+    </div>
+    <div class="spot-count" id="spot-count">Showing <span>0</span> spots</div>
+    <div class="spot-list" id="spot-list"></div>
+  </div>
+
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="map-hint">Click anywhere on the map to add a foraging spot</div>
+
+    <!-- Zone Reference Panel -->
+    <div class="zone-ref" id="zone-ref">
+      <button class="zr-close" id="zr-close">×</button>
+      <h3>BWS Vegetation Zones</h3>
+      <div id="zr-list"></div>
+      <div class="zr-src">Source: <a href="https://www.boardofwatersupply.com/conservation/conservation-tips/xeriscape/o%CA%BBahu-plant-guide/" target="_blank">Board of Water Supply Oʻahu Plant Guide</a><br>Zones based on rainfall &amp; elevation data from U.S. Fish &amp; Wildlife Services, revised 2009.</div>
+    </div>
+
+    <!-- Plant Lookup Panel -->
+    <div class="plant-lookup" id="plant-lookup">
+      <button class="pl-close" id="pl-close">×</button>
+      <h3>🌱 Zone Plant Reference</h3>
+      <select class="pl-search" id="pl-zone-select" style="margin-bottom:4px">
+        <option value="all">All Zones (1–9)</option>
+        <option value="1">Zone 1 — Dry, &lt;150ft</option>
+        <option value="2">Zone 2 — Dry, 150–1,000ft</option>
+        <option value="3">Zone 3 — Dry, 1,000–3,000ft</option>
+        <option value="4">Zone 4 — Mesic, &lt;150ft</option>
+        <option value="5">Zone 5 — Mesic, 150–1,000ft</option>
+        <option value="6">Zone 6 — Mesic, 1,000–3,000ft</option>
+        <option value="7">Zone 7 — Wet, &lt;150ft</option>
+        <option value="8">Zone 8 — Wet, 150–1,000ft</option>
+        <option value="9">Zone 9 — Wet, 1,000–3,000ft</option>
+      </select>
+      <input class="pl-search" id="pl-search" type="text" placeholder="Search plants by name…">
+      <div id="pl-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="mo" id="mo">
+  <div class="modal">
+    <div class="mh"><h2 id="mtitle">Add Foraging Spot</h2><button class="mx" id="mclose">×</button></div>
+    <div class="mb">
+      <div class="fd"><label>Plant / Fruit Name</label><input type="text" id="f-name" placeholder="e.g. Mango, Lilikoi, Breadfruit…"></div>
+      <div class="coord-row">
+        <div class="fd"><label>Latitude</label><input type="text" id="f-lat" placeholder="21.4389"></div>
+        <div class="fd"><label>Longitude</label><input type="text" id="f-lng" placeholder="-157.9781"></div>
+      </div>
+      <div class="fd">
+        <label>BWS Climate Zone</label>
+        <select id="f-zone">
+          <option value="">— Select zone (optional) —</option>
+          <option value="1">Zone 1 — Dry, &lt;150ft</option>
+          <option value="2">Zone 2 — Dry, 150–1,000ft</option>
+          <option value="3">Zone 3 — Dry, 1,000–3,000ft</option>
+          <option value="4">Zone 4 — Mesic, &lt;150ft</option>
+          <option value="5">Zone 5 — Mesic, 150–1,000ft</option>
+          <option value="6">Zone 6 — Mesic, 1,000–3,000ft</option>
+          <option value="7">Zone 7 — Wet, &lt;150ft</option>
+          <option value="8">Zone 8 — Wet, 150–1,000ft</option>
+          <option value="9">Zone 9 — Wet, 1,000–3,000ft</option>
+        </select>
+      </div>
+      <div class="fd"><label>Best Months (Season)</label><div class="season-grid" id="season-grid"></div></div>
+      <div class="fd"><label>Yield / Quantity Estimate</label><input type="text" id="f-yield" placeholder="e.g. Heavy crop, ~20 lbs, 3 trees worth…"></div>
+      <div class="fd"><label>Notes</label><textarea id="f-notes" placeholder="Access tips, tree condition, quality…"></textarea></div>
+      <div class="fd"><label>Photo</label>
+        <div class="photo-area" id="photo-area">
+          <span class="ph-label">Click or tap to add a photo</span>
+          <span class="ph-sub">JPG / PNG, stored locally</span>
+          <img id="photo-preview" src="" alt="">
+          <button class="photo-rm" id="photo-rm" type="button">×</button>
+        </div>
+        <input type="file" id="photo-input" accept="image/*">
+      </div>
+    </div>
+    <div class="mf"><button class="btn-cancel" id="btn-mc">Cancel</button><button class="btn-save" id="btn-ms">Save Spot</button></div>
+  </div>
+</div>
+
+<input type="file" id="import-input" accept=".json">
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  ZONE DATA
+// ═══════════════════════════════════════════════
+const ZONES = [
+  {id:1, name:'Zone 1', rain:'Dry (0–47″)', elev:'< 150 ft', color:'#d4a017', type:'Dry Coastal'},
+  {id:2, name:'Zone 2', rain:'Dry (0–47″)', elev:'150–1,000 ft', color:'#c0882a', type:'Dry Lowland'},
+  {id:3, name:'Zone 3', rain:'Dry (0–47″)', elev:'1,000–3,000 ft', color:'#a67030', type:'Dry Upland'},
+  {id:4, name:'Zone 4', rain:'Mesic (48–98″)', elev:'< 150 ft', color:'#5aad6e', type:'Mesic Coastal'},
+  {id:5, name:'Zone 5', rain:'Mesic (48–98″)', elev:'150–1,000 ft', color:'#3d8b50', type:'Mesic Lowland'},
+  {id:6, name:'Zone 6', rain:'Mesic (48–98″)', elev:'1,000–3,000 ft', color:'#2d6b3a', type:'Mesic Upland'},
+  {id:7, name:'Zone 7', rain:'Wet (> 98″)', elev:'< 150 ft', color:'#3aa4c4', type:'Wet Coastal'},
+  {id:8, name:'Zone 8', rain:'Wet (> 98″)', elev:'150–1,000 ft', color:'#2584a3', type:'Wet Lowland'},
+  {id:9, name:'Zone 9', rain:'Wet (> 98″)', elev:'1,000–3,000 ft', color:'#1a6070', type:'Wet Upland'}
+];
+
+// Zone 1 plant reference (from BWS PDF). Add more zones over time.
+const ZONE_PLANTS = {
+  1:[
+    {cat:'Tree',common:'ʻUlu / Breadfruit',sci:'Artocarpus altilis',status:'Polynesian',h:'34–69 ft'},
+    {cat:'Tree',common:'Niu / Coconut',sci:'Cocos nucifera',status:'Polynesian',h:'96–115 ft'},
+    {cat:'Tree',common:'Kou',sci:'Cordia subcordata',status:'Indigenous',h:'17–34 ft'},
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree',common:'Wiliwili',sci:'Erythrina sandwicensis',status:'Endemic',h:'46–57 ft'},
+    {cat:'Tree',common:'Olopua',sci:'Nestegis sandwicensis',status:'Endemic',h:'31–96 ft'},
+    {cat:'Tree',common:'ʻOhe / ʻOheʻohe',sci:'Reynoldsia sandwicensis',status:'Endemic',h:'76–115 ft'},
+    {cat:'Tree',common:'Hame',sci:'Antidesma pulvinatum',status:'Endemic',h:'8–46 ft'},
+    {cat:'Tree/Shrub',common:'Noni / Indian Mulberry',sci:'Morinda citrifolia',status:'Polynesian',h:'11–23 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Tree/Shrub',common:'Milo',sci:'Thespesia populnea',status:'Indigenous',h:'19–76 ft'},
+    {cat:'Tree/Shrub',common:'Alaheʻe',sci:'Psydrax odorata',status:'Indigenous',h:'11–57 ft'},
+    {cat:'Tree/Shrub',common:'ʻIliahialoʻe / Coast Sandalwood',sci:'Santalum ellipticum',status:'Endemic',h:'4–19 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Tree/Shrub',common:'Kuluʻī',sci:'Nototrichium sandwicense',status:'Endemic',h:'3–27 ft'},
+    {cat:'Shrub',common:'ʻIlima',sci:'Sida fallax',status:'Indigenous',h:'1–11 ft'},
+    {cat:'Shrub',common:'Naupaka Kahakai',sci:'Scaevola taccada',status:'Indigenous',h:'8–11 ft'},
+    {cat:'Shrub',common:'Maʻo / Hawaiian Cotton',sci:'Gossypium tomentosum',status:'Endemic',h:'2–6 ft'},
+    {cat:'Shrub',common:'ʻŌhelo Kai',sci:'Lycium sandwicense',status:'Indigenous',h:'3–4 ft'},
+    {cat:'Shrub',common:'ʻOhai',sci:'Sesbania tomentosa',status:'Endemic',h:'2–5 ft'},
+    {cat:'Shrub',common:'Maiapilo',sci:'Capparis sandwichiana',status:'Endemic',h:'4–15 ft'},
+    {cat:'Shrub',common:'Kolomona',sci:'Senna gaudichaudii',status:'Indigenous',h:'2–15 ft'},
+    {cat:'Herb',common:'Pōpolo',sci:'Solanum americanum',status:'Possibly Indigenous',h:'4–5 ft'},
+    {cat:'Herb',common:'Pua Kala / Hawaiian Poppy',sci:'Argemone glauca',status:'Endemic',h:'3–6 ft'},
+    {cat:'Herb',common:'ʻĀkulikuli / Sea Purslane',sci:'Sesuvium portulacastrum',status:'Indigenous',h:'1–4 ft'},
+    {cat:'Vine',common:'Pōhuehue / Beach Morning Glory',sci:'Ipomoea pes-caprae',status:'Indigenous',h:'1 ft'},
+    {cat:'Vine',common:'Koali ʻAwa',sci:'Ipomoea indica',status:'Indigenous',h:'19–27 ft'},
+    {cat:'Vine',common:'Hawaiian Moon Flower',sci:'Ipomoea tuboides',status:'Endemic',h:'11–19 ft'},
+    {cat:'Grass',common:'Kō / Sugarcane',sci:'Saccharum officinarum',status:'Polynesian',h:'8–11 ft'},
+    {cat:'Grass',common:'Pili Grass',sci:'Heteropogon contortus',status:'Indigenous',h:'2–4 ft'},
+  ],
+  2:[
+    {cat:'Tree',common:'ʻUlu / Breadfruit',sci:'Artocarpus altilis',status:'Polynesian',h:'34–69 ft'},
+    {cat:'Tree',common:'Niu / Coconut',sci:'Cocos nucifera',status:'Polynesian',h:'96–115 ft'},
+    {cat:'Tree',common:'Kou',sci:'Cordia subcordata',status:'Indigenous',h:'17–34 ft'},
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree',common:'Wiliwili',sci:'Erythrina sandwicensis',status:'Endemic',h:'46–57 ft'},
+    {cat:'Tree',common:'Olopua',sci:'Nestegis sandwicensis',status:'Endemic',h:'31–96 ft'},
+    {cat:'Tree',common:'Koa',sci:'Acacia koa',status:'Endemic',h:'50–80 ft'},
+    {cat:'Tree/Shrub',common:'Noni / Indian Mulberry',sci:'Morinda citrifolia',status:'Polynesian',h:'11–23 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Tree/Shrub',common:'Milo',sci:'Thespesia populnea',status:'Indigenous',h:'19–76 ft'},
+    {cat:'Tree/Shrub',common:'Alaheʻe',sci:'Psydrax odorata',status:'Indigenous',h:'11–57 ft'},
+    {cat:'Tree/Shrub',common:'Māmaki',sci:'Pipturus albidus',status:'Endemic',h:'8–23 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Tree/Shrub',common:'ʻIliahialoʻe / Coast Sandalwood',sci:'Santalum ellipticum',status:'Endemic',h:'4–19 ft'},
+    {cat:'Shrub',common:'ʻIlima',sci:'Sida fallax',status:'Indigenous',h:'1–11 ft'},
+    {cat:'Shrub',common:'Naupaka Kahakai',sci:'Scaevola taccada',status:'Indigenous',h:'8–11 ft'},
+    {cat:'Shrub',common:'Maʻo / Hawaiian Cotton',sci:'Gossypium tomentosum',status:'Endemic',h:'2–6 ft'},
+    {cat:'Shrub',common:'Kolomona',sci:'Senna gaudichaudii',status:'Indigenous',h:'2–15 ft'},
+    {cat:'Herb',common:'Pōpolo',sci:'Solanum americanum',status:'Possibly Indigenous',h:'4–5 ft'},
+    {cat:'Herb',common:'Pua Kala / Hawaiian Poppy',sci:'Argemone glauca',status:'Endemic',h:'3–6 ft'},
+    {cat:'Herb',common:'ʻUkiʻuki',sci:'Dianella sandwicensis',status:'Indigenous',h:'2–8 ft'},
+    {cat:'Herb',common:'Koʻokoʻolau',sci:'Bidens cervicata',status:'Endemic',h:'3–10 ft'},
+    {cat:'Vine',common:'Koali ʻAwa',sci:'Ipomoea indica',status:'Indigenous',h:'19–27 ft'},
+    {cat:'Grass',common:'Kō / Sugarcane',sci:'Saccharum officinarum',status:'Polynesian',h:'8–11 ft'},
+    {cat:'Grass',common:'Pili Grass',sci:'Heteropogon contortus',status:'Indigenous',h:'2–4 ft'},
+  ],
+  3:[
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree',common:'Olopua',sci:'Nestegis sandwicensis',status:'Endemic',h:'31–96 ft'},
+    {cat:'Tree',common:'Koa',sci:'Acacia koa',status:'Endemic',h:'50–80 ft'},
+    {cat:'Tree',common:'ʻŌhiʻa Lehua',sci:'Metrosideros polymorpha',status:'Endemic',h:'6–82 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Tree/Shrub',common:'Māmaki',sci:'Pipturus albidus',status:'Endemic',h:'8–23 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Tree/Shrub',common:'Alaheʻe',sci:'Psydrax odorata',status:'Indigenous',h:'11–57 ft'},
+    {cat:'Tree/Shrub',common:'Kōpiko',sci:'Psychotria mariniana',status:'Endemic',h:'8–38 ft'},
+    {cat:'Shrub',common:'ʻIlima',sci:'Sida fallax',status:'Indigenous',h:'1–11 ft'},
+    {cat:'Shrub',common:'ʻĀkia',sci:'Wikstroemia oahuensis',status:'Endemic',h:'4–15 ft'},
+    {cat:'Shrub',common:'Naupaka Kuahiwi',sci:'Scaevola gaudichaudiana',status:'Endemic',h:'2–8 ft'},
+    {cat:'Herb',common:'Pōpolo',sci:'Solanum americanum',status:'Possibly Indigenous',h:'4–5 ft'},
+    {cat:'Herb',common:'Koʻokoʻolau',sci:'Bidens torta',status:'Endemic',h:'4–10 ft'},
+    {cat:'Herb',common:'ʻUkiʻuki',sci:'Dianella sandwicensis',status:'Indigenous',h:'2–8 ft'},
+    {cat:'Grass',common:'Kō / Sugarcane',sci:'Saccharum officinarum',status:'Polynesian',h:'8–11 ft'},
+    {cat:'Grass',common:'Pili Grass',sci:'Heteropogon contortus',status:'Indigenous',h:'2–4 ft'},
+  ],
+  4:[
+    {cat:'Tree',common:'ʻUlu / Breadfruit',sci:'Artocarpus altilis',status:'Polynesian',h:'34–69 ft'},
+    {cat:'Tree',common:'Niu / Coconut',sci:'Cocos nucifera',status:'Polynesian',h:'96–115 ft'},
+    {cat:'Tree',common:'Kou',sci:'Cordia subcordata',status:'Indigenous',h:'17–34 ft'},
+    {cat:'Tree',common:'Kukui / Candlenut',sci:'Aleurites moluccana',status:'Polynesian',h:'34–76 ft'},
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree/Shrub',common:'Noni / Indian Mulberry',sci:'Morinda citrifolia',status:'Polynesian',h:'11–23 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Tree/Shrub',common:'Milo',sci:'Thespesia populnea',status:'Indigenous',h:'19–76 ft'},
+    {cat:'Tree/Shrub',common:'Māmaki',sci:'Pipturus albidus',status:'Endemic',h:'8–23 ft'},
+    {cat:'Tree/Shrub',common:'Kōpiko Kea',sci:'Psychotria kaduana',status:'Endemic',h:'15–31 ft'},
+    {cat:'Tree/Shrub',common:'Alaheʻe',sci:'Psydrax odorata',status:'Indigenous',h:'11–57 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Shrub',common:'ʻIlima',sci:'Sida fallax',status:'Indigenous',h:'1–11 ft'},
+    {cat:'Shrub',common:'Naupaka Kahakai',sci:'Scaevola taccada',status:'Indigenous',h:'8–11 ft'},
+    {cat:'Shrub',common:'Kī / Ti',sci:'Cordyline fruticosa',status:'Polynesian',h:'8–13 ft'},
+    {cat:'Shrub',common:'ʻŪlei',sci:'Osteomeles anthyllidifolia',status:'Indigenous',h:'4–11 ft'},
+    {cat:'Herb',common:'Kalo / Taro',sci:'Colocasia esculenta',status:'Polynesian',h:'2–4 ft'},
+    {cat:'Herb',common:'Maiʻa / Banana',sci:'Musa x paradisiaca',status:'Polynesian',h:'8–38 ft'},
+    {cat:'Herb',common:'Pia / Polynesian Arrowroot',sci:'Tacca leontopetaloides',status:'Polynesian',h:'4–6 ft'},
+    {cat:'Herb',common:'Pōpolo',sci:'Solanum americanum',status:'Possibly Indigenous',h:'4–5 ft'},
+    {cat:'Herb',common:'Makou',sci:'Peucedanum sandwicense',status:'Endemic',h:'2–8 ft'},
+    {cat:'Fern',common:'ʻAmaʻu / Tree Fern',sci:'Sadleria cyatheoides',status:'Endemic',h:'6–13 ft'},
+    {cat:'Grass',common:'Kō / Sugarcane',sci:'Saccharum officinarum',status:'Polynesian',h:'8–11 ft'},
+  ],
+  5:[
+    {cat:'Tree',common:'ʻUlu / Breadfruit',sci:'Artocarpus altilis',status:'Polynesian',h:'34–69 ft'},
+    {cat:'Tree',common:'Niu / Coconut',sci:'Cocos nucifera',status:'Polynesian',h:'96–115 ft'},
+    {cat:'Tree',common:'Koa',sci:'Acacia koa',status:'Endemic',h:'50–80 ft'},
+    {cat:'Tree',common:'Kukui / Candlenut',sci:'Aleurites moluccana',status:'Polynesian',h:'34–76 ft'},
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree',common:'Olopua',sci:'Nestegis sandwicensis',status:'Endemic',h:'31–96 ft'},
+    {cat:'Tree',common:'ʻŌhiʻa Lehua',sci:'Metrosideros polymorpha',status:'Endemic',h:'6–82 ft'},
+    {cat:'Tree/Shrub',common:'Noni / Indian Mulberry',sci:'Morinda citrifolia',status:'Polynesian',h:'11–23 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Tree/Shrub',common:'Māmaki',sci:'Pipturus albidus',status:'Endemic',h:'8–23 ft'},
+    {cat:'Tree/Shrub',common:'Kōpiko',sci:'Psychotria mariniana',status:'Endemic',h:'8–38 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Tree/Shrub',common:'Alaheʻe',sci:'Psydrax odorata',status:'Indigenous',h:'11–57 ft'},
+    {cat:'Shrub',common:'ʻIlima',sci:'Sida fallax',status:'Indigenous',h:'1–11 ft'},
+    {cat:'Shrub',common:'Kī / Ti',sci:'Cordyline fruticosa',status:'Polynesian',h:'8–13 ft'},
+    {cat:'Shrub',common:'ʻŪlei',sci:'Osteomeles anthyllidifolia',status:'Indigenous',h:'4–11 ft'},
+    {cat:'Shrub',common:'Naupaka Kuahiwi',sci:'Scaevola gaudichaudiana',status:'Endemic',h:'2–8 ft'},
+    {cat:'Shrub',common:'ʻĀkia',sci:'Wikstroemia oahuensis',status:'Endemic',h:'4–15 ft'},
+    {cat:'Herb',common:'ʻApe / Elephant Ear',sci:'Alocasia macrorrhiza',status:'Polynesian',h:'4–19 ft'},
+    {cat:'Herb',common:'Kalo / Taro',sci:'Colocasia esculenta',status:'Polynesian',h:'2–4 ft'},
+    {cat:'Herb',common:'Maiʻa / Banana',sci:'Musa x paradisiaca',status:'Polynesian',h:'8–38 ft'},
+    {cat:'Herb',common:'Koʻokoʻolau',sci:'Bidens amplectens',status:'Endemic',h:'2–5 ft'},
+    {cat:'Herb',common:'ʻUkiʻuki',sci:'Dianella sandwicensis',status:'Indigenous',h:'2–8 ft'},
+    {cat:'Herb',common:'Pōpolo',sci:'Solanum americanum',status:'Possibly Indigenous',h:'4–5 ft'},
+    {cat:'Fern',common:'Hāpuʻu / Tree Fern',sci:'Cibotium glaucum',status:'Endemic',h:'4–23 ft'},
+    {cat:'Fern',common:'Hōʻiʻo / Pohole (edible fiddlehead)',sci:'Diplazium arnottii',status:'Endemic',h:'3–6 ft'},
+    {cat:'Fern',common:'ʻAmaʻu / Tree Fern',sci:'Sadleria cyatheoides',status:'Endemic',h:'6–13 ft'},
+    {cat:'Grass',common:'ʻOhe / Hawaiian Bamboo',sci:'Schizostachyum glaucifolium',status:'Possibly Indigenous',h:'34–46 ft'},
+    {cat:'Grass',common:'Kō / Sugarcane',sci:'Saccharum officinarum',status:'Polynesian',h:'8–11 ft'},
+  ],
+  6:[
+    {cat:'Tree',common:'Koa',sci:'Acacia koa',status:'Endemic',h:'50–80 ft'},
+    {cat:'Tree',common:'ʻŌhiʻa Lehua',sci:'Metrosideros polymorpha',status:'Endemic',h:'6–82 ft'},
+    {cat:'Tree',common:'Kukui / Candlenut',sci:'Aleurites moluccana',status:'Polynesian',h:'34–76 ft'},
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree',common:'Olopua',sci:'Nestegis sandwicensis',status:'Endemic',h:'31–96 ft'},
+    {cat:'Tree',common:'Kōlea',sci:'Myrsine lessertiana',status:'Endemic',h:'19–57 ft'},
+    {cat:'Tree/Shrub',common:'Māmaki',sci:'Pipturus albidus',status:'Endemic',h:'8–23 ft'},
+    {cat:'Tree/Shrub',common:'Kōpiko',sci:'Psychotria mariniana',status:'Endemic',h:'8–38 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Tree/Shrub',common:'Alaheʻe',sci:'Psydrax odorata',status:'Indigenous',h:'11–57 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Shrub',common:'ʻIlima',sci:'Sida fallax',status:'Indigenous',h:'1–11 ft'},
+    {cat:'Shrub',common:'Kī / Ti',sci:'Cordyline fruticosa',status:'Polynesian',h:'8–13 ft'},
+    {cat:'Shrub',common:'Naupaka Kuahiwi',sci:'Scaevola gaudichaudiana',status:'Endemic',h:'2–8 ft'},
+    {cat:'Shrub',common:'ʻĀkia',sci:'Wikstroemia oahuensis',status:'Endemic',h:'4–15 ft'},
+    {cat:'Shrub',common:'ʻŪlei',sci:'Osteomeles anthyllidifolia',status:'Indigenous',h:'4–11 ft'},
+    {cat:'Herb',common:'Koʻokoʻolau',sci:'Bidens torta',status:'Endemic',h:'4–10 ft'},
+    {cat:'Herb',common:'ʻUkiʻuki',sci:'Dianella sandwicensis',status:'Indigenous',h:'2–8 ft'},
+    {cat:'Herb',common:'Pōpolo',sci:'Solanum americanum',status:'Possibly Indigenous',h:'4–5 ft'},
+    {cat:'Fern',common:'Hāpuʻu / Tree Fern',sci:'Cibotium glaucum',status:'Endemic',h:'4–23 ft'},
+    {cat:'Fern',common:'Hōʻiʻo / Pohole (edible fiddlehead)',sci:'Diplazium arnottii',status:'Endemic',h:'3–6 ft'},
+    {cat:'Fern',common:'Pala / Mule Foot Fern',sci:'Marattia douglasii',status:'Endemic',h:'5–10 ft'},
+    {cat:'Fern',common:'ʻAmaʻu / Tree Fern',sci:'Sadleria cyatheoides',status:'Endemic',h:'6–13 ft'},
+  ],
+  7:[
+    {cat:'Tree',common:'Koa',sci:'Acacia koa',status:'Endemic',h:'50–80 ft'},
+    {cat:'Tree',common:'ʻŌhiʻa Lehua',sci:'Metrosideros polymorpha',status:'Endemic',h:'6–82 ft'},
+    {cat:'Tree',common:'Kukui / Candlenut',sci:'Aleurites moluccana',status:'Polynesian',h:'34–76 ft'},
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree',common:'Olopua',sci:'Nestegis sandwicensis',status:'Endemic',h:'31–96 ft'},
+    {cat:'Tree',common:'Kōlea',sci:'Myrsine lessertiana',status:'Endemic',h:'19–57 ft'},
+    {cat:'Tree/Shrub',common:'Māmaki',sci:'Pipturus albidus',status:'Endemic',h:'8–23 ft'},
+    {cat:'Tree/Shrub',common:'Kōpiko',sci:'Psychotria mariniana',status:'Endemic',h:'8–38 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Shrub',common:'Kī / Ti',sci:'Cordyline fruticosa',status:'Polynesian',h:'8–13 ft'},
+    {cat:'Shrub',common:'Naupaka Kuahiwi',sci:'Scaevola gaudichaudiana',status:'Endemic',h:'2–8 ft'},
+    {cat:'Shrub',common:'ʻĀkia',sci:'Wikstroemia oahuensis',status:'Endemic',h:'4–15 ft'},
+    {cat:'Herb',common:'Koʻokoʻolau',sci:'Bidens campylotheca',status:'Endemic',h:'3–15 ft'},
+    {cat:'Herb',common:'ʻUkiʻuki',sci:'Dianella sandwicensis',status:'Indigenous',h:'2–8 ft'},
+    {cat:'Fern',common:'Hāpuʻu / Tree Fern',sci:'Cibotium glaucum',status:'Endemic',h:'4–23 ft'},
+    {cat:'Fern',common:'Hōʻiʻo / Pohole (edible fiddlehead)',sci:'Diplazium arnottii',status:'Endemic',h:'3–6 ft'},
+    {cat:'Fern',common:'Pala / Mule Foot Fern',sci:'Marattia douglasii',status:'Endemic',h:'5–10 ft'},
+    {cat:'Fern',common:'ʻAmaʻu / Tree Fern',sci:'Sadleria cyatheoides',status:'Endemic',h:'6–13 ft'},
+  ],
+  8:[
+    {cat:'Tree',common:'Koa',sci:'Acacia koa',status:'Endemic',h:'50–80 ft'},
+    {cat:'Tree',common:'ʻŌhiʻa Lehua',sci:'Metrosideros polymorpha',status:'Endemic',h:'6–82 ft'},
+    {cat:'Tree',common:'Kukui / Candlenut',sci:'Aleurites moluccana',status:'Polynesian',h:'34–76 ft'},
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree',common:'Olopua',sci:'Nestegis sandwicensis',status:'Endemic',h:'31–96 ft'},
+    {cat:'Tree',common:'Kōlea',sci:'Myrsine lessertiana',status:'Endemic',h:'19–57 ft'},
+    {cat:'Tree/Shrub',common:'Māmaki',sci:'Pipturus albidus',status:'Endemic',h:'8–23 ft'},
+    {cat:'Tree/Shrub',common:'Kōpiko',sci:'Psychotria mariniana',status:'Endemic',h:'8–38 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Shrub',common:'Kī / Ti',sci:'Cordyline fruticosa',status:'Polynesian',h:'8–13 ft'},
+    {cat:'Shrub',common:'Naupaka Kuahiwi',sci:'Scaevola gaudichaudiana',status:'Endemic',h:'2–8 ft'},
+    {cat:'Shrub',common:'ʻĀkia',sci:'Wikstroemia oahuensis',status:'Endemic',h:'4–15 ft'},
+    {cat:'Herb',common:'Kalo / Taro',sci:'Colocasia esculenta',status:'Polynesian',h:'2–4 ft'},
+    {cat:'Herb',common:'Maiʻa / Banana',sci:'Musa x paradisiaca',status:'Polynesian',h:'8–38 ft'},
+    {cat:'Herb',common:'Maiʻa Hīʻō (Feʻi Banana)',sci:'Musa troglodytarum',status:'Polynesian',h:'19–46 ft'},
+    {cat:'Herb',common:'Koʻokoʻolau',sci:'Bidens campylotheca',status:'Endemic',h:'3–15 ft'},
+    {cat:'Herb',common:'ʻUkiʻuki',sci:'Dianella sandwicensis',status:'Indigenous',h:'2–8 ft'},
+    {cat:'Herb',common:'Jewel Orchid',sci:'Anoectochilus sandvicensis',status:'Endemic',h:'< 2 ft'},
+    {cat:'Fern',common:'Hāpuʻu / Tree Fern',sci:'Cibotium glaucum',status:'Endemic',h:'4–23 ft'},
+    {cat:'Fern',common:'Hōʻiʻo / Pohole (edible fiddlehead)',sci:'Diplazium arnottii',status:'Endemic',h:'3–6 ft'},
+    {cat:'Fern',common:'ʻAmaʻu / Tree Fern',sci:'Sadleria cyatheoides',status:'Endemic',h:'6–13 ft'},
+  ],
+  9:[
+    {cat:'Tree',common:'Koa',sci:'Acacia koa',status:'Endemic',h:'50–80 ft'},
+    {cat:'Tree',common:'ʻŌhiʻa Lehua',sci:'Metrosideros polymorpha',status:'Endemic',h:'6–82 ft'},
+    {cat:'Tree',common:'Kukui / Candlenut',sci:'Aleurites moluccana',status:'Polynesian',h:'34–76 ft'},
+    {cat:'Tree',common:'Kōlea',sci:'Myrsine lessertiana',status:'Endemic',h:'19–57 ft'},
+    {cat:'Tree',common:'Lama',sci:'Diospyros sandwicensis',status:'Endemic',h:'8–57 ft'},
+    {cat:'Tree',common:'Olopua',sci:'Nestegis sandwicensis',status:'Endemic',h:'31–96 ft'},
+    {cat:'Tree/Shrub',common:'Māmaki',sci:'Pipturus albidus',status:'Endemic',h:'8–23 ft'},
+    {cat:'Tree/Shrub',common:'Kōpiko',sci:'Psychotria mariniana',status:'Endemic',h:'8–38 ft'},
+    {cat:'Tree/Shrub',common:'Hau',sci:'Hibiscus tiliaceus',status:'Indigenous',h:'8–76 ft'},
+    {cat:'Tree/Shrub',common:'ʻAʻaliʻi',sci:'Dodonaea viscosa',status:'Indigenous',h:'8–31 ft'},
+    {cat:'Shrub',common:'Kī / Ti',sci:'Cordyline fruticosa',status:'Polynesian',h:'8–13 ft'},
+    {cat:'Shrub',common:'Naupaka Kuahiwi',sci:'Scaevola gaudichaudiana',status:'Endemic',h:'2–8 ft'},
+    {cat:'Shrub',common:'ʻĀkia',sci:'Wikstroemia oahuensis',status:'Endemic',h:'4–15 ft'},
+    {cat:'Herb',common:'Kalo / Taro',sci:'Colocasia esculenta',status:'Polynesian',h:'2–4 ft'},
+    {cat:'Herb',common:'Maiʻa / Banana',sci:'Musa x paradisiaca',status:'Polynesian',h:'8–38 ft'},
+    {cat:'Herb',common:'Koʻokoʻolau',sci:'Bidens macrocarpa',status:'Endemic',h:'2–10 ft'},
+    {cat:'Herb',common:'ʻUkiʻuki',sci:'Dianella sandwicensis',status:'Indigenous',h:'2–8 ft'},
+    {cat:'Fern',common:'Hāpuʻu / Tree Fern',sci:'Cibotium glaucum',status:'Endemic',h:'4–23 ft'},
+    {cat:'Fern',common:'Hōʻiʻo / Pohole (edible fiddlehead)',sci:'Diplazium arnottii',status:'Endemic',h:'3–6 ft'},
+    {cat:'Fern',common:'Pala / Mule Foot Fern',sci:'Marattia douglasii',status:'Endemic',h:'5–10 ft'},
+    {cat:'Fern',common:'ʻAmaʻu / Tree Fern',sci:'Sadleria cyatheoides',status:'Endemic',h:'6–13 ft'},
+  ]
+};
+
+// ═══════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════
+const SKEY = 'oahu_foraging_spots';          // legacy localStorage (read-only, for migration)
+const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const PCOLORS = {};
+const CPAL = ['#2d6b45','#e8992f','#d95570','#2584a3','#6e5b8a','#6b4c3b','#c0392b','#1a6b8a','#8e44ad','#d4a017','#16a085','#c0564a','#3a7bd5','#e67e22','#27ae60'];
+let ci = 0;
+function pc(n){const k=n.toLowerCase().trim();if(!PCOLORS[k]){PCOLORS[k]=CPAL[ci%CPAL.length];ci++;}return PCOLORS[k];}
+
+// ─── Supabase client ───
+const SUPABASE_URL = 'https://elikishhggegcybaflcz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_qYBfu14XAZ7fM4rYQkkVbA_vE_WnQ69';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── In-memory cache ───
+let spots = [];           // all spots for the current user
+let currentUser = null;
+
+// ─── Synchronous accessors (used throughout the app) ───
+function load(){ return spots; }
+
+// ─── Async database operations ───
+async function refreshFromDB(){
+  const { data, error } = await sb.from('spots').select('*').order('created_at', { ascending: false });
+  if (error) { console.error(error); toast('⚠️ Load failed: ' + error.message); return []; }
+  spots = data || [];
+  return spots;
+}
+
+async function persistSpot(spot){
+  // spot uses DB schema. If it has id, it's an update; otherwise insert.
+  if (spot.id) {
+    const patch = { ...spot }; delete patch.id; delete patch.user_id; delete patch.created_at;
+    const { data, error } = await sb.from('spots').update(patch).eq('id', spot.id).select().single();
+    if (error) throw error;
+    const i = spots.findIndex(s => s.id === spot.id);
+    if (i >= 0) spots[i] = data;
+    return data;
+  } else {
+    const insertData = { ...spot, user_id: currentUser.id };
+    const { data, error } = await sb.from('spots').insert(insertData).select().single();
+    if (error) throw error;
+    spots.unshift(data);
+    return data;
+  }
+}
+
+async function removeSpotDB(id){
+  const spot = spots.find(s => s.id === id);
+  if (spot && spot.photo_url) {
+    const path = extractStoragePath(spot.photo_url);
+    if (path) await sb.storage.from('spot-photos').remove([path]);
+  }
+  const { error } = await sb.from('spots').delete().eq('id', id);
+  if (error) throw error;
+  spots = spots.filter(s => s.id !== id);
+}
+
+// ─── Photo upload helpers ───
+async function uploadPhoto(fileOrBlob, ext){
+  ext = ext || 'jpg';
+  const filename = `${currentUser.id}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from('spot-photos').upload(filename, fileOrBlob, { contentType: fileOrBlob.type || 'image/jpeg' });
+  if (error) throw error;
+  const { data } = sb.storage.from('spot-photos').getPublicUrl(filename);
+  return data.publicUrl;
+}
+
+function extractStoragePath(publicUrl){
+  // Public URL format: https://<project>.supabase.co/storage/v1/object/public/spot-photos/<path>
+  if (!publicUrl) return null;
+  const marker = '/spot-photos/';
+  const i = publicUrl.indexOf(marker);
+  return i === -1 ? null : publicUrl.substring(i + marker.length);
+}
+
+function dataUrlToBlob(dataUrl){
+  const [meta, b64] = dataUrl.split(',');
+  const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+  const bin = atob(b64); const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+// ═══════════════════════════════════════════════
+//  MAP
+// ═══════════════════════════════════════════════
+const map = L.map('map',{center:[21.4689,-157.97],zoom:11,zoomControl:false});
+L.control.zoom({position:'topright'}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
+
+// ═══════════════════════════════════════════════
+// ZONE MAP OVERLAYS — Offline-friendly, no server calls
+// Primary reference: BWS Vegetation Zone Map image
+// ═══════════════════════════════════════════════
+
+// BWS Vegetation Zone Map — THE authoritative zone reference
+// Source: Board of Water Supply Oʻahu Plant Guide
+const bwsZoneMap = L.imageOverlay(
+  'https://www.boardofwatersupply.com/media/j1dgegn1/oahu-planting-guide-vegetation-map-revision-2011-12-01.jpg',
+  [[21.245,-158.29],[21.72,-157.63]],
+  {opacity: 0.55, interactive: false}
+);
+
+// Satellite/aerial tile layer for terrain reference
+const satelliteLayer = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {attribution: 'Esri World Imagery', maxZoom: 19, opacity: 0.8}
+);
+
+// Topo map for elevation reference
+const topoLayer = L.tileLayer(
+  'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+  {attribution: 'OpenTopoMap', maxZoom: 17, opacity: 0.8}
+);
+
+// Layer control — all toggleable, all cacheable by browser
+const baseMaps = {
+  'Street Map': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap', maxZoom:19}),
+};
+
+const overlayMaps = {
+  '🗺 BWS Zone Map': bwsZoneMap,
+  '🛰 Satellite View': satelliteLayer,
+  '⛰ Topo / Elevation': topoLayer
+};
+
+const overlayCtrl = L.control.layers(null, overlayMaps, {position:'topright', collapsed: false});
+overlayCtrl.addTo(map);
+
+// BWS zone map available as a toggle (not shown by default — user enables when needed)
+
+// ═══════════════════════════════════════════════
+// OAHU HIKING TRAILS — Trailhead locations
+// Sources: Nā Ala Hele (DLNR), AllTrails, local guides
+// ═══════════════════════════════════════════════
+const TRAILS = [
+  // ── HONOLULU / SOUTH SHORE ──
+  {n:'Diamond Head Summit Trail',lat:21.2616,lng:-157.8046},
+  {n:'Mānoa Falls Trail',lat:21.3330,lng:-157.8025},
+  {n:'ʻAihualama Trail',lat:21.3350,lng:-157.8010},
+  {n:'Makiki Valley Trail',lat:21.3150,lng:-157.8240},
+  {n:'Maunalaha Trail',lat:21.3148,lng:-157.8236},
+  {n:'Kanealole Trail',lat:21.3155,lng:-157.8225},
+  {n:'Kalawahine Trail',lat:21.3330,lng:-157.8120},
+  {n:'Tantalus / ʻUalakaʻa Trail',lat:21.3130,lng:-157.8210},
+  {n:'Judd Memorial Loop Trail',lat:21.3380,lng:-157.8140},
+  {n:'Puʻu Pia Trail',lat:21.3370,lng:-157.7960},
+  {n:'Puʻu ʻŌhiʻa Trail',lat:21.3195,lng:-157.8135},
+  {n:'Nuʻuanu Trail',lat:21.3430,lng:-157.8080},
+  {n:'Pauoa Flats Trail',lat:21.3395,lng:-157.8115},
+  {n:'Kolowalu Trail',lat:21.3350,lng:-157.8050},
+  {n:'Lulumahu Falls Trail',lat:21.3530,lng:-157.8020},
+  {n:'Bowman Trail',lat:21.3500,lng:-157.8070},
+  {n:'Waʻahila Ridge Trail',lat:21.3060,lng:-157.7960},
+  {n:'Kuliʻouʻou Ridge Trail',lat:21.3100,lng:-157.7420},
+  {n:'Kuliʻouʻou Valley Trail',lat:21.3105,lng:-157.7415},
+  {n:'Lēʻahi (Diamond Head Crater Inside)',lat:21.2595,lng:-157.8060},
+  {n:'Koko Crater Railway Trail',lat:21.2845,lng:-157.6955},
+  {n:'Makapuʻu Lighthouse Trail',lat:21.3100,lng:-157.6580},
+  {n:'Kaʻiwa Ridge (Lanikai Pillbox)',lat:21.3870,lng:-157.7180},
+  {n:'Wiliwilinui Ridge Trail',lat:21.2980,lng:-157.7620},
+  {n:'Hawaiʻiloa Ridge Trail',lat:21.3020,lng:-157.7560},
+  {n:'Āina Haina Ridge Trail',lat:21.2920,lng:-157.7520},
+  {n:'Kamanaiki Trail',lat:21.2910,lng:-157.7340},
+  {n:'Hanauma Bay Ridge Trail',lat:21.2710,lng:-157.6960},
+  // ── WINDWARD / EAST SIDE ──
+  {n:'Maunawili Falls Trail',lat:21.3550,lng:-157.7520},
+  {n:'Maunawili Demonstration Trail',lat:21.3540,lng:-157.7700},
+  {n:'Old Pali Road Trail',lat:21.3600,lng:-157.7930},
+  {n:'Likeke Trail',lat:21.3700,lng:-157.7980},
+  {n:'Olomana Trail (Three Peaks)',lat:21.3640,lng:-157.7490},
+  {n:'Kaʻena Point Trail (Windward Access)',lat:21.5700,lng:-158.2300},
+  {n:'Hauʻula Loop Trail',lat:21.6100,lng:-157.9060},
+  {n:'Maʻakua Ridge Trail',lat:21.6110,lng:-157.9050},
+  {n:'Sacred Falls (Kaliuwaʻa) — CLOSED',lat:21.5900,lng:-157.8900},
+  {n:'Crouching Lion Trail',lat:21.5530,lng:-157.8520},
+  {n:'Kahana Valley Trails',lat:21.5410,lng:-157.8640},
+  {n:'Kaʻaʻawa Valley Trail',lat:21.5500,lng:-157.8480},
+  // ── CENTRAL / PEARL CITY / AIEA ──
+  {n:'ʻAiea Loop Trail',lat:21.3930,lng:-157.8940},
+  {n:'Keaiwa Heiau Trail',lat:21.3920,lng:-157.8960},
+  {n:'Waimano Pool Trail',lat:21.4270,lng:-157.9350},
+  {n:'Waimano Ridge Trail',lat:21.4270,lng:-157.9340},
+  {n:'Manana Trail',lat:21.4210,lng:-157.9310},
+  {n:'Kulanaʻahane Trail',lat:21.3620,lng:-157.8430},
+  {n:'Wahiawā Hills Trail',lat:21.5050,lng:-158.0220},
+  {n:'Poamoho Ridge Trail',lat:21.5300,lng:-158.0700},
+  {n:'Schofield-Waikāne Trail',lat:21.5200,lng:-157.9750},
+  // ── NORTH SHORE ──
+  {n:'Keālia Trail',lat:21.5530,lng:-158.1810},
+  {n:'Kuaokala Trail',lat:21.5480,lng:-158.1760},
+  {n:'Kaʻena Point Trail (North Shore Access)',lat:21.5780,lng:-158.2300},
+  {n:'Kaunala Trail (West)',lat:21.6050,lng:-158.0850},
+  {n:'Waimea Valley Trail',lat:21.6360,lng:-158.0530},
+  {n:'Ehukai Pillbox (Sunset Pillbox)',lat:21.6610,lng:-158.0520},
+  {n:'Ted Makalena Golf Course Trail',lat:21.6000,lng:-158.1010},
+  {n:'Pūpūkea-Paumalū Trail',lat:21.6540,lng:-158.0610},
+  // ── WEST SIDE / WAIʻANAE ──
+  {n:'Mākua Cave Trail',lat:21.5230,lng:-158.2310},
+  {n:'Mt. Kaʻala Trail',lat:21.5090,lng:-158.1480},
+  {n:'Waiʻanae Kai Trail',lat:21.4470,lng:-158.1850},
+  {n:'Kamaileunu Ridge Trail',lat:21.4520,lng:-158.1700},
+  {n:'Māʻili Pillbox (Pink Pillbox) Trail',lat:21.4130,lng:-158.1720},
+  {n:'Puʻu o Hulu Trail',lat:21.3920,lng:-158.1450},
+  {n:'Nānākuli Valley Trail',lat:21.3870,lng:-158.1460},
+  {n:'Palehua-Palikea Trail',lat:21.3880,lng:-158.0970},
+  // ── HISTORIC / CLOSED ──
+  {n:'Haʻikū Stairs (Stairway to Heaven) — REMOVED 2024',lat:21.4070,lng:-157.8190},
+  {n:'Moanalua Middle Ridge (Backside Stairway) — RESTRICTED',lat:21.3780,lng:-157.8680},
+  {n:'Kamananui Valley Road',lat:21.3780,lng:-157.8720},
+  {n:'Old Pali Highway Trail (historic)',lat:21.3600,lng:-157.7980},
+  {n:'Tripler Ridge Trail — UNMAINTAINED',lat:21.3690,lng:-157.8530},
+  {n:'Moanalua Valley to Koʻolau Summit — UNMAINTAINED',lat:21.3800,lng:-157.8600},
+  {n:'Mount Olympus (ʻAwaʻawaloa) Trail',lat:21.3150,lng:-157.7930},
+  {n:'Kapaʻahu (China Walls) Coastal Trail',lat:21.2710,lng:-157.7120},
+  {n:'Marinerʻs Ridge Trail',lat:21.3020,lng:-157.7280},
+  {n:'Hawaiʻi Loa Ridge to Koʻolau Summit',lat:21.3030,lng:-157.7550},
+  {n:'Sierra Club / Kuliʻouʻou to Koʻolau Summit',lat:21.3120,lng:-157.7400},
+  {n:'Kaʻau Crater Trail',lat:21.3280,lng:-157.7960},
+  {n:'Seven Bridges Trail (Mānoa)',lat:21.3310,lng:-157.8010},
+  {n:'Lyon Arboretum Trails',lat:21.3330,lng:-157.8030},
+  {n:'Puʻu Lanipo (Mauʻumae Ridge) Trail',lat:21.3020,lng:-157.7800},
+  {n:'Wilhelmina Rise Trail',lat:21.2970,lng:-157.7850},
+  {n:'Kalihi Ice Ponds Trail',lat:21.3760,lng:-157.8530},
+  {n:'Kalihi Saddle (Powerlines) Trail',lat:21.3700,lng:-157.8480},
+  {n:'Kamiloiki Ridge Trail',lat:21.3010,lng:-157.7220},
+  {n:'Hawaiʻi Kai Ridge Trail',lat:21.2950,lng:-157.7150},
+  {n:'Kalauao Valley Trail',lat:21.4050,lng:-157.9100},
+  {n:'Kapiolani Park / Diamond Head Beach Walk',lat:21.2650,lng:-157.8180},
+  {n:'Ala Wai Canal Path',lat:21.2810,lng:-157.8320},
+  {n:'Round Top / Tantalus Drive Loop',lat:21.3130,lng:-157.8260},
+  {n:'Honolulu Mauka Trail System (interconnected)',lat:21.3200,lng:-157.8180},
+  {n:'Puʻu Maʻeliʻeli Trail',lat:21.2850,lng:-157.6940},
+  {n:'Kawainui Marsh Path',lat:21.3950,lng:-157.7580},
+  {n:'Lanipō via Mauʻumae Trail',lat:21.3050,lng:-157.7800},
+  {n:'Maunawili Falls to Demonstration Connector',lat:21.3560,lng:-157.7540},
+  {n:'Koʻolau Summit Trail (Pali Puka)',lat:21.3620,lng:-157.7920},
+  {n:'Likeke Falls Trail',lat:21.3730,lng:-157.7970},
+  {n:'Maʻakua Gulch Trail',lat:21.6080,lng:-157.9020},
+  {n:'Puʻu Manamana (Turnover) Trail',lat:21.5510,lng:-157.8560},
+  {n:'Waiāhole Valley Trail',lat:21.4950,lng:-157.8560},
+  {n:'Waiheʻe Trail',lat:21.4770,lng:-157.8470},
+  {n:'Kaluanui Ridge Trail',lat:21.5400,lng:-157.8440},
+  {n:'Laʻie Falls Trail',lat:21.6350,lng:-157.9200},
+  {n:'Laʻie Ridge Trail',lat:21.6380,lng:-157.9250},
+  {n:'Kaipapau Gulch Trail',lat:21.6070,lng:-157.9020},
+  {n:'Punaluʻu Valley Trail',lat:21.5810,lng:-157.8880},
+  {n:'Kualoa Ranch Trails (private)',lat:21.5200,lng:-157.8380},
+  {n:'Heʻeia Trail',lat:21.4510,lng:-157.8060},
+  {n:'Hōʻomaluhia Botanical Garden Trails',lat:21.3890,lng:-157.8030},
+  {n:'Bellows Beach Coastal Trail',lat:21.3580,lng:-157.7160},
+  {n:'Waimānalo Bay Beach Park Trail',lat:21.3350,lng:-157.7060},
+  {n:'Kaʻōhao Ridge (Lanikai Hills) Trail',lat:21.3910,lng:-157.7170},
+  {n:'Honouliuli Contour Trail',lat:21.4340,lng:-158.0500},
+  {n:'Honouliuli Forest Reserve Access',lat:21.4500,lng:-158.0600},
+  {n:'Pearl Harbor Bike Path / Historic Trail',lat:21.3550,lng:-157.9500},
+  {n:'Waimalu Ditch Trail',lat:21.4100,lng:-157.9240},
+  {n:'Tripler Ridge to Koʻolau Summit',lat:21.3690,lng:-157.8530},
+  {n:'Waimano Falls Pool Trail',lat:21.4280,lng:-157.9360},
+  {n:'Halawa Valley Ridge Trail',lat:21.3980,lng:-157.9100},
+  {n:'Red Hill Trail',lat:21.3480,lng:-157.9180},
+  {n:'Kalauao to Aiea Ridge Connector',lat:21.4020,lng:-157.9050},
+  {n:'Pearl City Urban Garden Trails',lat:21.3960,lng:-157.9700},
+  {n:'Camp Smith / Hālawa Heights Trail',lat:21.3850,lng:-157.9000},
+  {n:'Mililani Ravine Trail',lat:21.4530,lng:-158.0100},
+  {n:'Kipapa Ridge Trail',lat:21.4600,lng:-158.0150},
+  {n:'Wahiawā Botanical Garden Trails',lat:21.5020,lng:-158.0200},
+  {n:'Lake Wilson / Wahiawā Reservoir Loop',lat:21.5050,lng:-158.0350},
+  {n:'Kolekole Pass Road / Trail',lat:21.5050,lng:-158.0800},
+  {n:'Schofield Barracks East Range Access (restricted)',lat:21.5100,lng:-158.0500},
+  {n:'Pāpālā Trail',lat:21.5880,lng:-158.0900},
+  {n:'Kawailoa Trail',lat:21.5600,lng:-158.1100},
+  {n:'Opaeula Trail',lat:21.5700,lng:-158.0900},
+  {n:'Kahuku Farm Trails',lat:21.6900,lng:-157.9650},
+  {n:'Turtle Bay Resort Coastal Trail',lat:21.7050,lng:-157.9950},
+  {n:'James Campbell Wildlife Refuge Trail',lat:21.6950,lng:-157.9500},
+  {n:'Haleʻiwa Beach Park to Aliʻi Beach Walk',lat:21.5950,lng:-158.1050},
+  {n:'Sharks Cove to Waimea Beach Coastal Path',lat:21.6520,lng:-158.0640},
+  {n:'Dillingham Airfield Perimeter Trail',lat:21.5790,lng:-158.1970},
+  {n:'Army Trail (Kawailoa) — restricted',lat:21.5500,lng:-158.0850},
+  {n:'Puʻu Kaʻena Trail',lat:21.5600,lng:-158.2100},
+  {n:'Peacock Flats / Camp Erdman Area',lat:21.5730,lng:-158.1700},
+  {n:'Kaʻena Point Satellite Tracking Station Road',lat:21.5620,lng:-158.2500},
+  {n:'Kuaokalā Access Road',lat:21.5500,lng:-158.1850},
+  {n:'Mākua Valley Trail (restricted military)',lat:21.5270,lng:-158.2350},
+  {n:'ʻŌhikilolo Ridge Trail',lat:21.5180,lng:-158.2200},
+  {n:'Mākaha Valley Ridge Trail',lat:21.4850,lng:-158.2100},
+  {n:'Waiʻanae Kaʻala Road (4WD Access)',lat:21.5100,lng:-158.1500},
+  {n:'Kaʻala Natural Area Reserve Trail',lat:21.5070,lng:-158.1500},
+  {n:'Puʻu Kaua Trail',lat:21.4650,lng:-158.1400},
+  {n:'Lualualei Naval Road (restricted)',lat:21.4350,lng:-158.1550},
+  {n:'Nānākuli Gulch Trail',lat:21.3850,lng:-158.1500},
+  {n:'Waiʻanae Comprehensive Health Trail',lat:21.4450,lng:-158.1870},
+  {n:'Mākua-Keaʻau Beach Trail',lat:21.5300,lng:-158.2400},
+  {n:'Ko Olina Beach Park Walking Trail',lat:21.3300,lng:-158.1200},
+  {n:'ʻEwa Coral Trail',lat:21.3150,lng:-158.0500},
+  {n:'Oneʻula Beach Park Coastal Path',lat:21.3120,lng:-158.0200},
+  {n:'Kahe Point Beach Trail',lat:21.3540,lng:-158.1310},
+  {n:'Kuaokalā GMA — Ranch Side Access',lat:21.5550,lng:-158.2400},
+  {n:'Kuaokalā GMA — Forest Side 4WD Road',lat:21.5500,lng:-158.2350},
+  {n:'Peacock Flats Hunting Unit Access',lat:21.5750,lng:-158.1650},
+  {n:'Kawaihāpai Hunting Access Road',lat:21.5800,lng:-158.2050},
+  {n:'Poamoho Hunting Unit Access',lat:21.5350,lng:-158.0750},
+  {n:'Kawailoa Hunting Unit Access',lat:21.5550,lng:-158.0950},
+  {n:'Kahuku Hunting Unit Access',lat:21.6850,lng:-157.9600},
+  {n:'Waimānalo Hunting Unit Access',lat:21.3500,lng:-157.7300},
+  {n:'Honouliuli Hunting Unit Access',lat:21.4400,lng:-158.0650},
+  {n:'Old Government Road (Waimānalo–Makapuʻu)',lat:21.3200,lng:-157.6680},
+  {n:'Lanihuli Trail (Castle Trail) — unmaintained',lat:21.3600,lng:-157.8100},
+  {n:'Tom Tom Trail',lat:21.4100,lng:-157.9000},
+  {n:'Konahuanui (Kʻ1 Summit) Trail — expert',lat:21.3500,lng:-157.7900},
+  {n:'Electric Beach to Tracks Beach Walk',lat:21.3550,lng:-158.1290},
+  {n:'Pālolo Valley Trail',lat:21.3050,lng:-157.7870},
+  {n:'Puʻu o Kona Trail',lat:21.3100,lng:-157.7950},
+  {n:'Wailupe Trail',lat:21.2960,lng:-157.7640},
+  {n:'Kamilonui Ridge Trail',lat:21.3000,lng:-157.7320},
+  {n:'Haha Trail — unmaintained',lat:21.3420,lng:-157.8040},
+  {n:'Makapu Heiau Trail (historic)',lat:21.5250,lng:-157.8350},
+  {n:'Wahiawā to Haleʻiwa Historic Rail Trail',lat:21.5100,lng:-158.0900},
+  {n:'Old Kolekole Trail (historic military)',lat:21.5080,lng:-158.0850},
+  {n:'Puʻu Keahi a Kahoe (Haʻikū Valley) — restricted',lat:21.4050,lng:-157.8200},
+  {n:'Kīpapa Gulch Trail — unmaintained',lat:21.4550,lng:-158.0100},
+  {n:'Waimalu Middle Ridge — unmaintained',lat:21.4150,lng:-157.9280},
+  {n:'Salt Lake / Āliamanu Crater Walk',lat:21.3450,lng:-157.9270},
+  {n:'North Shore Bike Path (Sunset to Turtle Bay)',lat:21.6700,lng:-158.0400},
+  {n:'Ala Moana Beach Park Loop',lat:21.2870,lng:-157.8490},
+  {n:'Magic Island Loop (Ala Moana)',lat:21.2850,lng:-157.8460},
+  {n:'Kailua Beach to Lanikai Beach Walk',lat:21.3930,lng:-157.7250},
+  {n:'Waimea Bay to Three Tables Coastal Walk',lat:21.6400,lng:-158.0620},
+  {n:'Sunset Beach to Banzai Pipeline Walk',lat:21.6660,lng:-158.0500},
+  {n:'Hanauma Bay Nature Preserve Trail',lat:21.2690,lng:-157.6940},
+  {n:'Sandy Beach to Makapuʻu Coastal Walk',lat:21.2860,lng:-157.6740},
+  {n:'Mokulēʻia Beach to Keālia Coastal Path',lat:21.5780,lng:-158.1900},
+  {n:'Mālaekahana Beach Trail',lat:21.6600,lng:-157.9300},
+  {n:'Goat Island (Mokuauia) Access Trail',lat:21.6620,lng:-157.9280},
+  {n:'Waimānalo Beach to Sherwood Forest Walk',lat:21.3400,lng:-157.7150},
+  {n:'Kahana Bay Beach Park Trail',lat:21.5430,lng:-157.8610},
+  {n:'Chinamanʻs Hat (Mokoliʻi) Coastal Access',lat:21.5200,lng:-157.8360},
+  {n:'Ford Island Historic Walk (restricted)',lat:21.3600,lng:-157.9600},
+  {n:'Ewa Beach Coastal Path',lat:21.3100,lng:-158.0100},
+  {n:'Foster Botanical Garden Path',lat:21.3180,lng:-157.8560},
+  {n:'Koko Crater Botanical Garden Trail',lat:21.2850,lng:-157.6900},
+  {n:'Senator Fong\u2019s Plantation Trail',lat:21.4750,lng:-157.8350},
+  {n:'Waimea Valley Botanical Trail',lat:21.6350,lng:-158.0520},
+  {n:'Wahiawā Botanical Garden Nature Walk',lat:21.5030,lng:-158.0190},
+  {n:'Liliuokalani Botanical Garden Walk',lat:21.3220,lng:-157.8600},
+  {n:'Moanalua Gardens Heritage Trail',lat:21.3640,lng:-157.8780},
+];
+
+// Trail icon (boot/footprint style)
+function trailIcon(){
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#5d4037" stroke="#fff" stroke-width="1.5" opacity="0.85"/><text x="11" y="15" text-anchor="middle" fill="#fff" font-size="12" font-family="sans-serif">⛰</text></svg>`;
+  return L.divIcon({html:svg,iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-12],className:''});
+}
+
+// Create trail layer group
+const trailLayerGroup = L.layerGroup();
+TRAILS.forEach(t=>{
+  const m = L.marker([t.lat,t.lng],{icon:trailIcon()});
+  m.bindPopup(`<strong style="font-family:'Playfair Display',serif;font-size:13px;color:#5d4037">${t.n}</strong><br><span style="font-size:11px;color:#666">${t.lat.toFixed(4)}, ${t.lng.toFixed(4)}</span>`);
+  trailLayerGroup.addLayer(m);
+});
+
+// Add trails to layer control
+overlayCtrl.addOverlay(trailLayerGroup, '🥾 Hiking Trails (' + TRAILS.length + ')');
+
+// Zone overlay helpers (used by zone filter chips & panels)
+function showZoneOverlay(zoneId) {
+  if (!map.hasLayer(bwsZoneMap)) bwsZoneMap.addTo(map);
+}
+function showAllZoneOverlays() {
+  if (!map.hasLayer(bwsZoneMap)) bwsZoneMap.addTo(map);
+}
+
+let markers={}, activeMonthFilter=null, activeZoneFilter=null, addMode=true, editingId=null;
+
+function makeIcon(color){
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.27 21.73 0 14 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="14" cy="13" r="5.5" fill="#fff" opacity=".9"/></svg>`;
+  return L.divIcon({html:svg,iconSize:[28,40],iconAnchor:[14,40],popupAnchor:[0,-36],className:''});
+}
+
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+// ═══════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════
+function filtered(spots){
+  let r = spots;
+  if(activeMonthFilter!==null) r = r.filter(s=>s.months&&s.months.includes(activeMonthFilter));
+  if(activeZoneFilter!==null) r = r.filter(s=>s.zone==activeZoneFilter);
+  return r;
+}
+
+function renderAll(){
+  const spots=load();
+  const shown=filtered(spots);
+  renderMarkers(shown);
+  renderList(spots,shown);
+  document.querySelector('#spot-count span').textContent=shown.length;
+}
+
+function renderMarkers(shown){
+  Object.values(markers).forEach(m=>map.removeLayer(m));
+  markers={};
+  shown.forEach(s=>{
+    const color=pc(s.name);
+    const m=L.marker([s.lat,s.lng],{icon:makeIcon(color)}).addTo(map);
+    const z=s.zone?ZONES.find(z=>z.id==s.zone):null;
+    let h=`<div style="min-width:170px"><strong style="font-family:'Playfair Display',serif;font-size:15px;color:${color}">${esc(s.name)}</strong>`;
+    if(z) h+=`<br><span style="font-size:10px;padding:1px 6px;border-radius:6px;background:${z.color};color:#fff;font-weight:700">${z.name} — ${z.type}</span>`;
+    if(s.months&&s.months.length) h+=`<br><span style="font-size:11px;color:#6b4c3b">📅 ${s.months.map(i=>MO[i]).join(', ')}</span>`;
+    if(s.yield) h+=`<br><span style="font-size:11px;color:#2584a3;font-weight:600">📦 ${esc(s.yield)}</span>`;
+    if(s.notes) h+=`<br><span style="font-size:11.5px;color:#555">${esc(s.notes).substring(0,120)}</span>`;
+    if(s.photo_url) h+=`<br><img src="${s.photo_url}" style="max-width:180px;max-height:90px;border-radius:5px;margin-top:4px;object-fit:cover">`;
+    h+=`</div>`;
+    m.bindPopup(h);
+    markers[s.id]=m;
+  });
+}
+
+function renderList(all,shown){
+  const el=document.getElementById('spot-list');
+  if(!shown.length){
+    el.innerHTML=`<div class="empty"><div class="ei">🌺</div><h3>${all.length?'No matches':'No spots yet'}</h3><p>${all.length?'Clear filters to see all spots.':'Click the map or use Manual to add your first foraging spot.'}</p></div>`;
+    return;
+  }
+  el.innerHTML=shown.map(s=>{
+    const color=pc(s.name);
+    const z=s.zone?ZONES.find(z=>z.id==s.zone):null;
+    const ms=s.months&&s.months.length?s.months.map(i=>MO[i]).join(', '):'Year-round';
+    return`<div class="scard" data-id="${s.id}">
+      <div class="sc-top">
+        <div class="sc-name"><span class="cdot" style="background:${color}"></span>${esc(s.name)}</div>
+        ${z?`<span class="sc-zone-badge" style="background:${z.color}">${z.name}</span>`:''}
+      </div>
+      <div class="sc-months">📅 ${ms}</div>
+      ${s.yield?`<div class="sc-yield">📦 ${esc(s.yield)}</div>`:''}
+      ${s.notes?`<div class="sc-notes">${esc(s.notes)}</div>`:''}
+      ${s.photo_url?`<img class="sc-photo-thumb" src="${s.photo_url}" alt="">`:''}
+      <div class="sc-actions">
+        <button class="sc-btn sc-btn-fly" onclick="flyTo('${s.id}')">🗺</button>
+        <button class="sc-btn sc-btn-edit" onclick="editSpot('${s.id}')">✏️ Edit</button>
+        <button class="sc-btn sc-btn-del" onclick="deleteSpot('${s.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+//  MAP CLICK
+// ═══════════════════════════════════════════════
+map.on('click',e=>{if(addMode) openModal(null,e.latlng.lat,e.latlng.lng);});
+
+// ═══════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════
+const overlay=document.getElementById('mo');
+const seasonGrid=document.getElementById('season-grid');
+let selMonths=[];
+// Photo state: track new file uploads separately from existing URLs
+let curPhotoFile = null;          // new File chosen this session, needs upload
+let curPhotoExistingUrl = null;   // existing photo URL when editing a spot
+let curPhotoRemoved = false;      // user clicked X to remove an existing photo
+
+MO.forEach((m,i)=>{
+  const b=document.createElement('button');b.type='button';b.className='sc';b.textContent=m;b.dataset.m=i;
+  b.addEventListener('click',()=>{b.classList.toggle('active');if(b.classList.contains('active')){if(!selMonths.includes(i))selMonths.push(i);}else{selMonths=selMonths.filter(x=>x!==i);}});
+  seasonGrid.appendChild(b);
+});
+
+function openModal(spot,lat,lng){
+  editingId=spot?spot.id:null;
+  document.getElementById('mtitle').textContent=spot?'Edit Foraging Spot':'Add Foraging Spot';
+  document.getElementById('btn-ms').textContent=spot?'Update Spot':'Save Spot';
+  document.getElementById('f-name').value=spot?spot.name:'';
+  document.getElementById('f-lat').value=spot?spot.lat:(lat?lat.toFixed(6):'');
+  document.getElementById('f-lng').value=spot?spot.lng:(lng?lng.toFixed(6):'');
+  document.getElementById('f-zone').value=spot?(spot.zone||''):'';
+  document.getElementById('f-yield').value=spot?(spot.yield||''):'';
+  document.getElementById('f-notes').value=spot?(spot.notes||''):'';
+  selMonths=spot&&spot.months?[...spot.months]:[];
+  seasonGrid.querySelectorAll('.sc').forEach(b=>{b.classList.toggle('active',selMonths.includes(parseInt(b.dataset.m)));});
+  // Reset photo state for this open
+  curPhotoFile=null;
+  curPhotoRemoved=false;
+  curPhotoExistingUrl=spot?(spot.photo_url||null):null;
+  const prev=document.getElementById('photo-preview'),area=document.getElementById('photo-area');
+  if(curPhotoExistingUrl){prev.src=curPhotoExistingUrl;area.classList.add('has-photo');}else{prev.src='';area.classList.remove('has-photo');}
+  overlay.classList.add('open');
+  setTimeout(()=>document.getElementById('f-name').focus(),200);
+}
+
+function closeModal(){overlay.classList.remove('open');editingId=null;curPhotoFile=null;curPhotoExistingUrl=null;curPhotoRemoved=false;}
+document.getElementById('mclose').addEventListener('click',closeModal);
+document.getElementById('btn-mc').addEventListener('click',closeModal);
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
+
+// Photo
+document.getElementById('photo-area').addEventListener('click',e=>{if(e.target.id==='photo-rm')return;document.getElementById('photo-input').click();});
+document.getElementById('photo-input').addEventListener('change',function(){
+  const f=this.files[0];if(!f)return;
+  if(f.size>5*1024*1024)toast('⚠️ Large photo — consider smaller image');
+  curPhotoFile=f;
+  curPhotoRemoved=false;
+  const r=new FileReader();
+  r.onload=e=>{document.getElementById('photo-preview').src=e.target.result;document.getElementById('photo-area').classList.add('has-photo');};
+  r.readAsDataURL(f);
+  this.value='';
+});
+document.getElementById('photo-rm').addEventListener('click',e=>{
+  e.stopPropagation();
+  curPhotoFile=null;
+  curPhotoExistingUrl=null;
+  curPhotoRemoved=true;
+  document.getElementById('photo-preview').src='';
+  document.getElementById('photo-area').classList.remove('has-photo');
+});
+
+// Save
+document.getElementById('btn-ms').addEventListener('click',async ()=>{
+  const name=document.getElementById('f-name').value.trim();
+  const lat=parseFloat(document.getElementById('f-lat').value);
+  const lng=parseFloat(document.getElementById('f-lng').value);
+  if(!name){toast('⚠️ Enter a plant name');return;}
+  if(isNaN(lat)||isNaN(lng)){toast('⚠️ Valid coordinates needed');return;}
+  const btn=document.getElementById('btn-ms');
+  const wasText=btn.textContent;
+  btn.disabled=true;btn.textContent='Saving…';
+  try {
+    // Resolve final photo URL
+    let photo_url = curPhotoExistingUrl;
+    if (curPhotoFile) {
+      btn.textContent='Uploading photo…';
+      const ext = (curPhotoFile.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+      // If updating and there's an existing photo, delete it after successful upload
+      const oldPath = curPhotoExistingUrl ? extractStoragePath(curPhotoExistingUrl) : null;
+      photo_url = await uploadPhoto(curPhotoFile, ext);
+      if (oldPath) sb.storage.from('spot-photos').remove([oldPath]); // fire and forget
+    } else if (curPhotoRemoved && curPhotoExistingUrl) {
+      const oldPath = extractStoragePath(curPhotoExistingUrl);
+      if (oldPath) sb.storage.from('spot-photos').remove([oldPath]);
+      photo_url = null;
+    }
+    const zoneVal=document.getElementById('f-zone').value;
+    const d = {
+      name, lat, lng,
+      zone: zoneVal ? parseInt(zoneVal) : null,
+      months: selMonths.sort((a,b)=>a-b),
+      yield: document.getElementById('f-yield').value.trim(),
+      notes: document.getElementById('f-notes').value.trim(),
+      photo_url,
+    };
+    if (editingId) d.id = editingId;
+    await persistSpot(d);
+    closeModal();
+    renderAll();
+    toast(editingId ? '✅ Spot updated' : '✅ Spot added');
+    map.flyTo([lat,lng], Math.max(map.getZoom(),14), {duration:.8});
+  } catch (e) {
+    console.error(e);
+    toast('⚠️ Save failed: ' + (e.message||e));
+  } finally {
+    btn.disabled=false;btn.textContent=wasText;
+  }
+});
+
+// ═══════════════════════════════════════════════
+//  SPOT ACTIONS
+// ═══════════════════════════════════════════════
+window.flyTo=id=>{const s=load().find(x=>x.id===id);if(!s)return;map.flyTo([s.lat,s.lng],16,{duration:.8});setTimeout(()=>{if(markers[id])markers[id].openPopup();},900);};
+window.editSpot=id=>{const s=load().find(x=>x.id===id);if(s)openModal(s);};
+window.deleteSpot=async id=>{
+  if(!confirm('Delete this spot?'))return;
+  try{
+    await removeSpotDB(id);
+    renderAll();
+    toast('🗑 Deleted');
+  }catch(e){
+    console.error(e);
+    toast('⚠️ Delete failed: ' + (e.message||e));
+  }
+};
+
+// ═══════════════════════════════════════════════
+//  TOOLBAR BUTTONS
+// ═══════════════════════════════════════════════
+const btnAdd=document.getElementById('btn-add'),hint=document.getElementById('map-hint');
+btnAdd.addEventListener('click',()=>{addMode=!addMode;btnAdd.classList.toggle('active',addMode);hint.classList.toggle('show',addMode);if(addMode)setTimeout(()=>hint.classList.remove('show'),3500);});
+setTimeout(()=>{if(addMode){hint.classList.add('show');setTimeout(()=>hint.classList.remove('show'),4000);}},500);
+document.getElementById('btn-manual').addEventListener('click',()=>openModal(null,null,null));
+
+// ═══════════════════════════════════════════════
+//  FILTER TABS
+// ═══════════════════════════════════════════════
+document.querySelectorAll('.ftab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.ftab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('.filter-section').forEach(s=>s.classList.remove('active'));
+    document.getElementById('fs-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// Month filter chips
+const mfEl=document.getElementById('month-filter');
+MO.forEach((m,i)=>{
+  const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=m;
+  b.addEventListener('click',()=>{
+    if(activeMonthFilter===i){activeMonthFilter=null;b.classList.remove('active');}
+    else{activeMonthFilter=i;mfEl.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));b.classList.add('active');}
+    renderAll();
+  });
+  mfEl.appendChild(b);
+});
+
+// Zone filter chips
+const zfEl=document.getElementById('zone-filter');
+
+// Add "All" and "Clear" buttons
+const allBtn=document.createElement('button');allBtn.type='button';allBtn.className='chip';allBtn.textContent='All';allBtn.style.background='var(--bark)';allBtn.style.color='#fff';allBtn.style.borderColor='var(--bark)';
+allBtn.addEventListener('click',()=>{
+  activeZoneFilter=null;
+  zfEl.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  showAllZoneOverlays();
+  renderAll();
+});
+zfEl.appendChild(allBtn);
+
+const clrBtn=document.createElement('button');clrBtn.type='button';clrBtn.className='chip';clrBtn.textContent='Clear';clrBtn.style.borderStyle='dashed';
+clrBtn.addEventListener('click',()=>{
+  activeZoneFilter=null;
+  zfEl.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  showZoneOverlay(null);
+  renderAll();
+});
+zfEl.appendChild(clrBtn);
+
+ZONES.forEach(z=>{
+  const b=document.createElement('button');b.type='button';b.className='chip';
+  b.innerHTML=`<span class="zone-chip-color" style="background:${z.color}"></span>Z${z.id}`;
+  b.addEventListener('click',()=>{
+    if(activeZoneFilter===z.id){
+      activeZoneFilter=null;
+      b.classList.remove('active');
+      showZoneOverlay(null);
+    } else {
+      activeZoneFilter=z.id;
+      zfEl.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      b.classList.add('active');
+      showZoneOverlay(z.id);
+    }
+    renderAll();
+  });
+  zfEl.appendChild(b);
+});
+
+// ═══════════════════════════════════════════════
+//  ZONE REFERENCE PANEL
+// ═══════════════════════════════════════════════
+const zrEl=document.getElementById('zr-list');
+ZONES.forEach(z=>{
+  zrEl.innerHTML+=`<div class="zr-row"><div class="zr-dot" style="background:${z.color}"></div><div class="zr-name">${z.name}</div><div class="zr-desc">${z.rain}, ${z.elev} — ${z.type}</div></div>`;
+});
+document.getElementById('btn-zones').addEventListener('click',()=>{
+  const panel=document.getElementById('zone-ref');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')){showAllZoneOverlays();}
+  else{showZoneOverlay(null);}
+});
+document.getElementById('zr-close').addEventListener('click',()=>{document.getElementById('zone-ref').classList.remove('open');if(!activeZoneFilter)showZoneOverlay(null);});
+
+// ═══════════════════════════════════════════════
+//  PLANT LOOKUP PANEL
+// ═══════════════════════════════════════════════
+function renderPlants(filter,zoneId){
+  const el=document.getElementById('pl-list');
+  // Collect all plants, grouping by scientific name to show multi-zone presence
+  const speciesMap = {};
+  Object.entries(ZONE_PLANTS).forEach(([zid,plants])=>{
+    if(zoneId && zoneId!=='all' && zid!==zoneId) return;
+    plants.forEach(p=>{
+      const key = p.sci;
+      if(!speciesMap[key]){
+        speciesMap[key] = {...p, zones: [parseInt(zid)]};
+      } else {
+        if(!speciesMap[key].zones.includes(parseInt(zid))) speciesMap[key].zones.push(parseInt(zid));
+      }
+    });
+  });
+  let all = Object.values(speciesMap);
+  // Sort by category then common name
+  all.sort((a,b) => a.cat.localeCompare(b.cat) || a.common.localeCompare(b.common));
+  if(filter){
+    const q=filter.toLowerCase();
+    all=all.filter(p=>p.common.toLowerCase().includes(q)||p.sci.toLowerCase().includes(q)||p.cat.toLowerCase().includes(q));
+  }
+  if(!all.length){el.innerHTML='<div style="padding:10px;color:#999;font-size:12px">No plants found for this filter.</div>';return;}
+  // Group by category for display
+  let currentCat = '';
+  let html = `<div style="font-size:10px;color:#999;margin-bottom:6px">${all.length} species</div>`;
+  all.forEach(p=>{
+    if(p.cat !== currentCat){
+      currentCat = p.cat;
+      html += `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--canopy);margin:10px 0 4px;border-bottom:1px solid rgba(26,58,42,.1);padding-bottom:2px">${currentCat}</div>`;
+    }
+    const zoneTags = p.zones.sort((a,b)=>a-b).map(zid=>{
+      const z=ZONES.find(x=>x.id===zid);
+      return `<span style="display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:${z.color};color:#fff;font-weight:700;margin-right:2px">Z${zid}</span>`;
+    }).join('');
+    const multiZone = p.zones.length > 1 ? ` <span style="font-size:9px;color:var(--bark)">(${p.zones.length} zones)</span>` : '';
+    html += `<div class="pl-item"><span class="pl-common">${p.common}</span>${multiZone} <span class="pl-sci">${p.sci}</span><br><span class="pl-meta">${p.status} · ${p.h} · ${zoneTags}</span></div>`;
+  });
+  el.innerHTML = html;
+}
+
+document.getElementById('btn-plants').addEventListener('click',()=>{
+  const panel=document.getElementById('plant-lookup');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open'))renderPlants('',document.getElementById('pl-zone-select').value);
+});
+document.getElementById('pl-close').addEventListener('click',()=>document.getElementById('plant-lookup').classList.remove('open'));
+document.getElementById('pl-search').addEventListener('input',e=>renderPlants(e.target.value,document.getElementById('pl-zone-select').value));
+document.getElementById('pl-zone-select').addEventListener('change',e=>renderPlants(document.getElementById('pl-search').value,e.target.value));
+
+// ═══════════════════════════════════════════════
+//  EXPORT / IMPORT
+// ═══════════════════════════════════════════════
+document.getElementById('btn-export').addEventListener('click',()=>{
+  const list=load();if(!list.length){toast('Nothing to export');return;}
+  // Strip user_id from export — it's specific to this account
+  const exp = list.map(s=>{const c={...s};delete c.user_id;return c;});
+  const blob=new Blob([JSON.stringify(exp,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`toms-fruit-by-the-foot-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  toast(`⬇ Exported ${list.length} spots`);
+});
+
+document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('import-input').click());
+document.getElementById('import-input').addEventListener('change',function(){
+  const f=this.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=async e=>{
+    try{
+      const inc=JSON.parse(e.target.result);
+      if(!Array.isArray(inc))throw new Error('not an array');
+      const valid=inc.filter(s=>s.name && !isNaN(parseFloat(s.lat)) && !isNaN(parseFloat(s.lng)));
+      if(!valid.length){toast('⚠️ No valid spots found');return;}
+      toast(`Importing ${valid.length} spots…`);
+      let a=0, photoCount=0;
+      for (const s of valid) {
+        const rec = {
+          name: String(s.name),
+          lat: parseFloat(s.lat),
+          lng: parseFloat(s.lng),
+          zone: s.zone ? (isNaN(parseInt(s.zone)) ? null : parseInt(s.zone)) : null,
+          months: Array.isArray(s.months) ? s.months.map(m=>parseInt(m)).filter(m=>!isNaN(m)) : [],
+          yield: s.yield ? String(s.yield) : null,
+          notes: s.notes ? String(s.notes) : null,
+          photo_url: null,
+        };
+        // Handle legacy "photo" field (base64 data URL) — upload to storage
+        if (s.photo && typeof s.photo === 'string' && s.photo.startsWith('data:')) {
+          try {
+            const blob = dataUrlToBlob(s.photo);
+            const ext = (blob.type.split('/')[1]||'jpg').replace(/[^a-z0-9]/gi,'')||'jpg';
+            rec.photo_url = await uploadPhoto(blob, ext);
+            photoCount++;
+          } catch (err) { console.warn('Photo upload failed for', s.name, err); }
+        } else if (s.photo_url) {
+          // New-format photo URL: keep as-is (note: it points to whoever's bucket exported it)
+          rec.photo_url = String(s.photo_url);
+        }
+        try {
+          await persistSpot(rec);
+          a++;
+        } catch (err) { console.warn('Spot insert failed for', s.name, err); }
+      }
+      renderAll();
+      toast(`⬆ Imported ${a} spots${photoCount?` (${photoCount} photos)`:''}`);
+    } catch (err) {
+      console.error(err);
+      toast('⚠️ Invalid JSON');
+    }
+  };
+  r.readAsText(f);
+  this.value='';
+});
+
+// ═══════════════════════════════════════════════
+//  SIDEBAR TOGGLE
+// ═══════════════════════════════════════════════
+document.getElementById('toggle-sb').addEventListener('click',()=>{document.getElementById('sidebar').classList.toggle('collapsed');setTimeout(()=>map.invalidateSize(),400);});
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+// ═══════════════════════════════════════════════
+//  AUTH & INIT
+// ═══════════════════════════════════════════════
+const loginOverlay = document.getElementById('login-overlay');
+const loginBtn = document.getElementById('login-btn');
+const loginErr = document.getElementById('login-error');
+const loginEmail = document.getElementById('login-email');
+const loginPass = document.getElementById('login-password');
+
+async function attemptLogin(){
+  loginErr.textContent='';
+  const email = loginEmail.value.trim();
+  const password = loginPass.value;
+  if (!email || !password) { loginErr.textContent='Email and password required'; return; }
+  loginBtn.disabled=true;loginBtn.textContent='Signing in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  loginBtn.disabled=false;loginBtn.textContent='Sign In';
+  if (error) { loginErr.textContent = error.message; return; }
+  await onLoginSuccess(data.user);
+}
+
+loginBtn.addEventListener('click', attemptLogin);
+loginEmail.addEventListener('keydown', e => { if (e.key==='Enter') loginPass.focus(); });
+loginPass.addEventListener('keydown', e => { if (e.key==='Enter') attemptLogin(); });
+
+document.getElementById('btn-logout').addEventListener('click', async ()=>{
+  if (!confirm('Sign out?')) return;
+  await sb.auth.signOut();
+  location.reload();
+});
+
+async function onLoginSuccess(user){
+  currentUser = user;
+  document.getElementById('sync-indicator').textContent='Loading your spots…';
+  await refreshFromDB();
+  loginOverlay.classList.add('hidden');
+  // Mobile: collapse sidebar after login
+  if (window.innerWidth <= 700) document.getElementById('sidebar').classList.add('collapsed');
+  // Make sure the map renders correctly after the overlay clears
+  setTimeout(()=>map.invalidateSize(), 100);
+  renderAll();
+  // Offer one-time migration from legacy localStorage data
+  await offerLegacyMigration();
+}
+
+async function offerLegacyMigration(){
+  let legacy=[];
+  try { legacy = JSON.parse(localStorage.getItem(SKEY)||'[]'); } catch { return; }
+  if (!Array.isArray(legacy) || legacy.length===0) return;
+  // Only offer if cloud is empty (avoid double-imports)
+  if (spots.length > 0) return;
+  if (!confirm(`Found ${legacy.length} spots saved locally on this browser.\n\nImport them to your cloud account?\n\nClick OK to import, Cancel to skip.\n(You can always export the local data manually first if unsure.)`)) return;
+  toast(`Importing ${legacy.length} legacy spots…`);
+  let n=0, photoN=0;
+  for (const s of legacy) {
+    if (!s.name || isNaN(parseFloat(s.lat)) || isNaN(parseFloat(s.lng))) continue;
+    const rec = {
+      name: String(s.name),
+      lat: parseFloat(s.lat),
+      lng: parseFloat(s.lng),
+      zone: s.zone ? (isNaN(parseInt(s.zone)) ? null : parseInt(s.zone)) : null,
+      months: Array.isArray(s.months) ? s.months : [],
+      yield: s.yield || null,
+      notes: s.notes || null,
+      photo_url: null,
+    };
+    if (s.photo && typeof s.photo === 'string' && s.photo.startsWith('data:')) {
+      try {
+        const blob = dataUrlToBlob(s.photo);
+        const ext = (blob.type.split('/')[1]||'jpg').replace(/[^a-z0-9]/gi,'')||'jpg';
+        rec.photo_url = await uploadPhoto(blob, ext);
+        photoN++;
+      } catch (err) { console.warn('Photo upload failed:', err); }
+    }
+    try { await persistSpot(rec); n++; } catch (err) { console.warn(err); }
+  }
+  renderAll();
+  toast(`⬆ Migrated ${n} spots${photoN?` (${photoN} photos)`:''}`);
+  if (n === legacy.length && confirm('Migration complete! Clear the local copy now?')) {
+    localStorage.removeItem(SKEY);
+  }
+}
+
+// On page load: check for existing session, otherwise show login
+(async ()=>{
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      await onLoginSuccess(session.user);
+    } else {
+      loginOverlay.classList.remove('hidden');
+      setTimeout(()=>loginEmail.focus(), 200);
+    }
+  } catch (e) {
+    console.error('Auth init failed:', e);
+    loginOverlay.classList.remove('hidden');
+    loginErr.textContent = 'Connection failed. Check your internet.';
+  }
+})();
+
+// Empty render initially (app shows login first)
+renderAll();
+</script>
+</body>
+</html>
