@@ -330,6 +330,10 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--sand);color:var(--lav
 
 <script>
 // ═══════════════════════════════════════════════
+// Tom's Fruit by the Foot — v9 (photo compression)
+// ═══════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════
 //  ZONE DATA
 // ═══════════════════════════════════════════════
 const ZONES = [
@@ -658,6 +662,41 @@ function dataUrlToBlob(dataUrl){
   const bin = atob(b64); const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new Blob([arr], { type: mime });
+}
+
+// Compress an image File to a smaller JPEG Blob.
+// Returns { blob, dataUrl, originalSize, newSize }.
+// Defaults: max 1600px on the long edge, 82% JPEG quality.
+async function compressPhoto(file, opts){
+  opts = opts || {};
+  const maxDim = opts.maxDim || 1600;
+  const quality = opts.quality || 0.82;
+  // Load the file into an Image element
+  const imgUrl = URL.createObjectURL(file);
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error('Could not read image'));
+    i.src = imgUrl;
+  });
+  // Calculate new dimensions preserving aspect ratio
+  let { width, height } = img;
+  if (width > maxDim || height > maxDim) {
+    if (width > height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+    else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+  }
+  // Draw to canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, width, height);
+  URL.revokeObjectURL(imgUrl);
+  // Export as JPEG
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+  const dataUrl = canvas.toDataURL('image/jpeg', quality);
+  return { blob, dataUrl, originalSize: file.size, newSize: blob.size };
 }
 
 // ═══════════════════════════════════════════════
@@ -1076,15 +1115,30 @@ overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
 
 // Photo
 document.getElementById('photo-area').addEventListener('click',e=>{if(e.target.id==='photo-rm')return;document.getElementById('photo-input').click();});
-document.getElementById('photo-input').addEventListener('change',function(){
-  const f=this.files[0];if(!f)return;
-  if(f.size>5*1024*1024)toast('⚠️ Large photo — consider smaller image');
-  curPhotoFile=f;
-  curPhotoRemoved=false;
-  const r=new FileReader();
-  r.onload=e=>{document.getElementById('photo-preview').src=e.target.result;document.getElementById('photo-area').classList.add('has-photo');};
-  r.readAsDataURL(f);
-  this.value='';
+document.getElementById('photo-input').addEventListener('change', async function(){
+  const f=this.files[0]; this.value=''; if(!f) return;
+  const area=document.getElementById('photo-area');
+  const prev=document.getElementById('photo-preview');
+  area.classList.add('has-photo');
+  prev.style.opacity='0.4';
+  try {
+    const { blob, dataUrl, originalSize, newSize } = await compressPhoto(f);
+    // Wrap the blob as a File so the rest of the save flow doesn't need to change
+    curPhotoFile = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+    curPhotoRemoved = false;
+    prev.src = dataUrl;
+    prev.style.opacity='1';
+    const origKb = Math.round(originalSize/1024);
+    const newKb = Math.round(newSize/1024);
+    if (originalSize > newSize * 1.5) toast(`📷 Compressed ${origKb}KB → ${newKb}KB`);
+  } catch (err) {
+    console.error(err);
+    toast('⚠️ Could not process image');
+    area.classList.remove('has-photo');
+    prev.src='';
+    prev.style.opacity='1';
+    curPhotoFile = null;
+  }
 });
 document.getElementById('photo-rm').addEventListener('click',e=>{
   e.stopPropagation();
@@ -1110,10 +1164,9 @@ document.getElementById('btn-ms').addEventListener('click',async ()=>{
     let photo_url = curPhotoExistingUrl;
     if (curPhotoFile) {
       btn.textContent='Uploading photo…';
-      const ext = (curPhotoFile.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
-      // If updating and there's an existing photo, delete it after successful upload
+      // curPhotoFile is always a compressed JPEG from compressPhoto()
       const oldPath = curPhotoExistingUrl ? extractStoragePath(curPhotoExistingUrl) : null;
-      photo_url = await uploadPhoto(curPhotoFile, ext);
+      photo_url = await uploadPhoto(curPhotoFile, 'jpg');
       if (oldPath) sb.storage.from('spot-photos').remove([oldPath]); // fire and forget
     } else if (curPhotoRemoved && curPhotoExistingUrl) {
       const oldPath = extractStoragePath(curPhotoExistingUrl);
