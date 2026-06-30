@@ -2,9 +2,10 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # Runs at 17:00 UTC every Monday (7:00 AM HST)
+    # Mondays at 17:00 UTC (7:00 AM HST)
     - cron: '0 17 * * 1'
-  # Allow manual triggering from the Actions tab for testing
+    # Thursdays at 17:00 UTC (7:00 AM HST)
+    - cron: '0 17 * * 4'
   workflow_dispatch:
 
 jobs:
@@ -13,7 +14,13 @@ jobs:
     steps:
       - name: Ping Supabase
         run: |
-          curl -sS -o /dev/null -w "HTTP %{http_code}\n" \
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/spots?select=id&limit=1"
+            "${{ secrets.SUPABASE_URL }}/rest/v1/spots?select=id&limit=1")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Supabase ping failed with status $STATUS"
+            exit 1
+          fi
+          echo "✅ Supabase is alive"
