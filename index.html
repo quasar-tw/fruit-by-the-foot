@@ -202,6 +202,14 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--sand);color:var(--lav
 
 /* Sync indicator */
 #sync-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;opacity:.55;letter-spacing:.5px;text-transform:uppercase;font-weight:600;pointer-events:none;}
+
+/* Connection status dot */
+#conn-status{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;opacity:.8;margin-top:5px;}
+#conn-dot{width:7px;height:7px;border-radius:50%;background:#aaa;flex-shrink:0;transition:background .4s;}
+#conn-status.online #conn-dot{background:#7ec883;}
+#conn-status.offline #conn-dot{background:#d95570;}
+#conn-status.checking #conn-dot{background:#f0b74a;animation:pulse-dot .9s ease-in-out infinite;}
+@keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:.3;}}
 </style>
 </head>
 <body>
@@ -225,6 +233,7 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--sand);color:var(--lav
     <div class="sb-header">
       <h1>🌿 Tom's Fruit by the Foot</h1>
       <p>Personal Harvest Map</p>
+      <div id="conn-status" class="checking"><span id="conn-dot"></span><span id="conn-label">Checking…</span></div>
       <button id="btn-logout" title="Sign out">Logout</button>
     </div>
     <div class="toolbar">
@@ -1467,6 +1476,25 @@ async function onLoginSuccess(user){
   renderAll();
   // Offer one-time migration from legacy localStorage data
   await offerLegacyMigration();
+  // Start connection status checks
+  checkConnection();
+  setInterval(checkConnection, 5 * 60 * 1000);
+}
+
+async function checkConnection(){
+  const el = document.getElementById('conn-status');
+  const label = document.getElementById('conn-label');
+  el.className = 'checking';
+  label.textContent = 'Checking…';
+  try {
+    const { error } = await sb.from('spots').select('id', { count: 'exact', head: true });
+    if (error) throw error;
+    el.className = 'online';
+    label.textContent = 'Connected';
+  } catch {
+    el.className = 'offline';
+    label.textContent = 'Offline';
+  }
 }
 
 async function offerLegacyMigration(){
